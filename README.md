@@ -25,20 +25,9 @@ Every table supports Add, Edit and Delete. A year selector at the top filters ev
 4. **Authentication → Sign In / Providers**: turn **off** "Allow new users to sign up" so nobody else can create an account.
 5. **Project Settings → API**: copy the **Project URL** and the **anon / publishable** key.
 
-## 2. Configure
+## 2. GitHub + Vercel (keys stay out of git)
 
-Edit `assets/js/config.js`:
-
-```js
-window.APP_CONFIG = {
-  SUPABASE_URL: 'https://xxxx.supabase.co',
-  SUPABASE_ANON_KEY: 'eyJ... or sb_publishable_...'
-};
-```
-
-The anon/publishable key is designed to be public; RLS protects the data. **Never** put the `service_role` / secret key here.
-
-## 3. GitHub + Vercel
+The Supabase URL and key are **not** in the repo. `assets/js/config.js` is in `.gitignore`; Vercel creates it at deploy time from environment variables.
 
 ```bash
 git remote add origin https://github.com/<you>/finance-tracker.git
@@ -46,9 +35,37 @@ git push -u origin main
 ```
 
 On <https://vercel.com>: **Add New → Project → Import** the repo.
-Framework preset: **Other**. Build command: *(empty)*. Output directory: *(empty / root)*. Deploy.
+
+1. Framework preset: **Other**. Leave Build Command and Output Directory empty (`vercel.json` sets the build command).
+2. Open **Environment Variables** and add:
+
+   | Name | Value |
+   |---|---|
+   | `SUPABASE_URL` | `https://xxxx.supabase.co` |
+   | `SUPABASE_ANON_KEY` | your anon / publishable key (`eyJ...` or `sb_publishable_...`) |
+
+3. Deploy. If either variable is missing, the build fails with a clear message instead of deploying a broken site.
+
+If you change a variable later, redeploy (Deployments → ⋯ → Redeploy) for it to take effect.
 
 Then in Supabase → **Authentication → URL Configuration**, set *Site URL* to your Vercel URL.
+
+### What "confidential" means here
+
+- The key is kept out of GitHub, so it isn't in your repo or its history.
+- A browser app still needs the key to talk to Supabase, so the deployed `config.js` is downloadable by anyone who opens your site. That is expected for the **anon / publishable** key. What protects your data is Row Level Security (only your login can read or write rows) and turning off sign-ups (step 1.4).
+- **Never** use the `service_role` / secret key in this app. It bypasses RLS and must stay server-side only.
+
+### Running locally
+
+```bash
+cp assets/js/config.example.js assets/js/config.js   # fill in your values; git ignores this file
+python3 -m http.server 8000                          # open http://localhost:8000
+```
+
+## 3. Supabase redirect (optional)
+
+Add `http://localhost:8000` under Supabase → Authentication → URL Configuration → Redirect URLs if you test locally.
 
 ## 4. Install on your phone
 
@@ -68,13 +85,14 @@ After changing any file, bump `CACHE` in `sw.js` (e.g. `finance-v2`) so installe
 ```
 index.html               app shell (sidebar, top bar, login, form modal)
 assets/js/app.js         all pages, forms, charts, Supabase calls
-assets/js/config.js      your Supabase URL + key
+assets/js/config.example.js  template for local config.js (real config.js is git-ignored)
+scripts/build-config.js  Vercel build step: writes config.js from env vars
 assets/css/volt.min.css  Volt theme (compiled from themesberg/volt-bootstrap-5-dashboard, MIT)
 assets/css/app.css       small additions
 assets/vendor/           Bootstrap 5.0.2 JS, Chart.js 4.4.1
 manifest.webmanifest, sw.js, assets/icons/   PWA install support
 supabase/schema.sql      database tables + security
-vercel.json              headers for the service worker
+vercel.json              build command + headers
 ```
 
 ## Notes on the calculations

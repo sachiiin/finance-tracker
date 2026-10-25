@@ -1,3 +1,8 @@
 .DS_Store
 .vercel
 node_modules
+
+# Supabase config — generated on Vercel from env vars, never committed
+assets/js/config.js
+.env
+.env.*

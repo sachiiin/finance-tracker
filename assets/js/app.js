@@ -2,6 +2,11 @@
 
 /* ════════════════════════════ Setup ════════════════════════════ */
 
+if (!window.APP_CONFIG) {
+  document.getElementById('loadingView').innerHTML =
+    '<div class="alert alert-danger m-4">Missing <code>assets/js/config.js</code>. On Vercel, set SUPABASE_URL and SUPABASE_ANON_KEY in Environment Variables and redeploy. Locally, copy <code>config.example.js</code> to <code>config.js</code>.</div>';
+  throw new Error('APP_CONFIG missing');
+}
 const sb = window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY);
 
 const DEFAULT_JOBS = [
