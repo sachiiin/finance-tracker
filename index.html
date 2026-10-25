@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover">
+  <title>Finance Tracker</title>
+  <meta name="theme-color" content="#1F2937">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Finance">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/volt.min.css">
+  <link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+  <!-- ───────────── Login ───────────── -->
+  <section id="loginView" class="vh-100 d-flex align-items-center justify-content-center bg-gray-50 d-none">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-12 col-sm-9 col-md-7 col-lg-5">
+          <div class="bg-white shadow border-0 rounded border-light p-4 p-lg-5">
+            <div class="text-center mb-4">
+              <img src="/assets/icons/logo.svg" width="56" height="56" alt="" class="mb-3">
+              <h1 class="h3 mb-1">Finance Tracker</h1>
+              <p class="text-gray-500 small mb-0">Sign in to continue</p>
+            </div>
+            <form id="loginForm" novalidate>
+              <div class="mb-3">
+                <label class="form-label" for="loginEmail">Email</label>
+                <input type="email" class="form-control" id="loginEmail" autocomplete="username" required>
+              </div>
+              <div class="mb-4">
+                <label class="form-label" for="loginPassword">Password</label>
+                <input type="password" class="form-control" id="loginPassword" autocomplete="current-password" required>
+              </div>
+              <div id="loginError" class="alert alert-danger small py-2 d-none"></div>
+              <button type="submit" class="btn btn-gray-800 w-100" id="loginBtn">Sign in</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────── App ───────────── -->
+  <div id="appView" class="d-none">
+    <!-- Mobile top bar -->
+    <nav class="navbar navbar-dark navbar-theme-primary px-4 col-12 d-lg-none">
+      <a class="navbar-brand me-lg-5 d-flex align-items-center" href="#/dashboard">
+        <img src="/assets/icons/logo.svg" width="28" height="28" alt="" class="me-2">
+        <span class="fw-bold text-white">Finance Tracker</span>
+      </a>
+      <button class="navbar-toggler d-lg-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+    </nav>
+
+    <!-- Sidebar -->
+    <nav id="sidebarMenu" class="sidebar d-lg-block bg-gray-800 text-white collapse">
+      <div class="sidebar-inner px-4 pt-3">
+        <div class="user-card d-flex d-md-none align-items-center justify-content-between pb-4">
+          <div class="d-block">
+            <h2 class="h6 mb-2 text-white" id="mobileUserEmail"></h2>
+            <button type="button" class="btn btn-secondary btn-sm" data-action="signout">Sign Out</button>
+          </div>
+          <div class="collapse-close d-md-none">
+            <a href="#sidebarMenu" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="true" aria-label="Close navigation">
+              <svg class="icon icon-xs" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </a>
+          </div>
+        </div>
+        <ul class="nav flex-column pt-3 pt-md-0" id="sideNav">
+          <li class="nav-item">
+            <a href="#/dashboard" class="nav-link d-flex align-items-center">
+              <span class="sidebar-icon"><img src="/assets/icons/logo.svg" height="22" width="22" alt=""></span>
+              <span class="mt-1 ms-2 sidebar-text fw-bold">Finance Tracker</span>
+            </a>
+          </li>
+          <li role="separator" class="dropdown-divider mt-3 mb-3 border-gray-700"></li>
+          <li class="nav-item" data-route="dashboard">
+            <a href="#/dashboard" class="nav-link">
+              <span class="sidebar-icon"><svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/></svg></span>
+              <span class="sidebar-text">Dashboard</span>
+            </a>
+          </li>
+
+          <li class="nav-label">Comes In</li>
+          <li class="nav-item" data-route="jobs">
+            <a href="#/jobs" class="nav-link">
+              <span class="sidebar-icon"><svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd"/><path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/></svg></span>
+              <span class="sidebar-text">Jobs</span>
+            </a>
+          </li>
+          <li class="nav-item" data-route="other">
+            <a href="#/other" class="nav-link">
+              <span class="sidebar-icon"><svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10.496 2.132a1 1 0 00-.992 0l-7 4A1 1 0 003 8v7a1 1 0 100 2h14a1 1 0 100-2V8a1 1 0 00.496-1.868l-7-4zM6 9a1 1 0 00-1 1v3a1 1 0 102 0v-3a1 1 0 00-1-1zm3 1a1 1 0 012 0v3a1 1 0 11-2 0v-3zm5-1a1 1 0 00-1 1v3a1 1 0 102 0v-3a1 1 0 00-1-1z" clip-rule="evenodd"/></svg></span>
+              <span class="sidebar-text">CRA / Other Income</span>
+            </a>
+          </li>
+
+          <li class="nav-label">Goes Out</li>
+          <li class="nav-item" data-route="bhaag">
+            <a href="#/bhaag" class="nav-link">
+              <span class="sidebar-icon"><svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg></span>
+              <span class="sidebar-text">10th-20th Bhaag</span>
+            </a>
+          </li>
+          <li class="nav-item" data-route="india">
+            <a href="#/india" class="nav-link">
+              <span class="sidebar-icon"><svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/></svg></span>
+              <span class="sidebar-text">India Payment</span>
+            </a>
+          </li>
+
+          <li class="nav-label">To Get Back</li>
+          <li class="nav-item" data-route="lent">
+            <a href="#/lent" class="nav-link">
+              <span class="sidebar-icon"><svg class="icon icon-xs me-2" fill="currentColor" viewBox="0 0 20 20"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/></svg></span>
+              <span class="sidebar-text">Money Lent</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="content">
+      <!-- Top bar -->
+      <nav class="navbar navbar-top navbar-expand navbar-dashboard navbar-dark ps-0 pe-2 pb-0">
+        <div class="container-fluid px-0">
+          <div class="d-flex justify-content-between align-items-center w-100">
+            <div class="d-flex align-items-center">
+              <label class="text-gray-500 small me-2 mb-0" for="yearSelect">Year</label>
+              <select id="yearSelect" class="form-select form-select-sm w-auto"></select>
+            </div>
+            <ul class="navbar-nav align-items-center">
+              <li class="nav-item dropdown ms-lg-3">
+                <a class="nav-link dropdown-toggle pt-1 px-0" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <div class="media d-flex align-items-center">
+                    <span class="avatar-initials rounded-circle" id="userInitial">S</span>
+                    <span class="ms-2 text-dark mb-0 small fw-bold d-none d-lg-block" id="userEmail"></span>
+                  </div>
+                </a>
+                <div class="dropdown-menu dashboard-dropdown dropdown-menu-end mt-2 py-1">
+                  <button class="dropdown-item d-flex align-items-center" data-action="signout">
+                    <svg class="dropdown-icon text-danger me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    Sign Out
+                  </button>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+
+      <div id="view" class="pb-4"></div>
+
+      <footer class="bg-white rounded shadow p-4 mb-4 mt-2 small text-gray-500">
+        Personal Finance Tracker · Theme based on Volt by Themesberg (MIT)
+      </footer>
+    </main>
+  </div>
+
+  <!-- Loading -->
+  <div id="loadingView" class="vh-100 d-flex align-items-center justify-content-center">
+    <div class="spinner-border text-gray-800" role="status"><span class="visually-hidden">Loading…</span></div>
+  </div>
+
+  <!-- Shared form modal -->
+  <div class="modal fade" id="formModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+      <form class="modal-content" id="entityForm" novalidate>
+        <div class="modal-header">
+          <h2 class="h5 modal-title" id="formTitle"></h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="formBody"></div>
+        <div class="modal-footer">
+          <div id="formError" class="alert alert-danger small py-2 w-100 d-none"></div>
+          <button type="button" class="btn btn-link text-gray-600" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-gray-800" id="formSave">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toastArea" class="toast-area"></div>
+
+  <script src="/assets/vendor/bootstrap.bundle.min.js"></script>
+  <script src="/assets/vendor/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/assets/js/config.js"></script>
+  <script src="/assets/js/app.js"></script>
+</body>
+</html>

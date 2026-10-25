@@ -1,0 +1,71 @@
+/* Small additions on top of Volt */
+
+body { background: #F2F4F6; }
+
+.nav-label {
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #9CA3AF;
+  padding: 1rem .75rem .35rem;
+}
+
+.avatar-initials {
+  width: 2rem; height: 2rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #1F2937; color: #f0bc74; font-weight: 700; font-size: .875rem;
+}
+
+/* Stat cards */
+.stat-card .icon-shape { flex-shrink: 0; }
+.min-w-0 { min-width: 0; }
+.table td.text-wrap { min-width: 7rem; }
+.table > :not(caption) > * > * { padding-left: .85rem; padding-right: .85rem; }
+.table > :not(caption) > * > *:first-child { padding-left: 1.5rem; }
+.stat-card .stat-label { font-size: .8rem; color: #6B7280; margin-bottom: .15rem; }
+.stat-card .stat-value { font-weight: 800; font-size: 1.35rem; margin-bottom: .15rem; line-height: 1.2; }
+.stat-card .stat-sub { font-size: .78rem; color: #6B7280; }
+.icon-shape-success { background: rgba(16, 185, 129, .12); color: #10B981; }
+.icon-shape-danger  { background: rgba(225, 29, 72, .1);   color: #E11D48; }
+.icon-shape-info    { background: rgba(35, 97, 206, .1);   color: #2361ce; }
+
+/* Tables */
+.table td, .table th { vertical-align: middle; }
+.table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.table tfoot td { font-weight: 700; border-top: 2px solid #E5E7EB; }
+.table .actions { white-space: nowrap; text-align: right; }
+.btn-icon { padding: .25rem .45rem; line-height: 1; }
+.btn-icon svg { width: 1rem; height: 1rem; }
+.row-selected td { background: #FFF8EC !important; }
+.empty-state { padding: 2.5rem 1rem; text-align: center; color: #6B7280; }
+
+.chart-box { position: relative; height: 300px; }
+.chart-box.pie { height: 280px; }
+
+/* Toasts */
+.toast-area { position: fixed; top: 1rem; right: 1rem; z-index: 2000; display: flex; flex-direction: column; gap: .5rem; max-width: calc(100vw - 2rem); }
+.toast-msg { background: #1F2937; color: #fff; padding: .75rem 1rem; border-radius: .5rem; box-shadow: 0 .5rem 1rem rgba(0,0,0,.15); font-size: .875rem; }
+.toast-msg.error { background: #E11D48; }
+
+/* Page header */
+.page-head { gap: .75rem; }
+.page-head h1 { font-size: 1.4rem; }
+
+/* Mobile */
+@media (max-width: 575.98px) {
+  .content { padding: 0 .75rem; }
+  .stat-card .stat-value { font-size: 1.15rem; }
+  .page-head .btn { width: 100%; }
+  .table { font-size: .85rem; }
+}
+
+/* Safe areas for installed app on notched phones */
+@supports (padding: env(safe-area-inset-top)) {
+  .navbar-theme-primary { padding-top: calc(.5rem + env(safe-area-inset-top)); }
+  main.content { padding-bottom: env(safe-area-inset-bottom); }
+}
+
+/* Top bar fixes */
+#yearSelect { min-width: 8.5rem; padding-right: 2.25rem; }
+#userEmail { color: #1F2937 !important; }
