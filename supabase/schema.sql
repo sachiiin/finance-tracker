@@ -139,7 +139,7 @@ create table if not exists public.accounts (
   id            bigint generated always as identity primary key,
   user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name          text not null,
-  kind          text not null default 'chequing' check (kind in ('chequing', 'credit_card', 'cash')),
+  kind          text not null default 'chequing',
   methods       text[] not null default '{}',     -- e.g. {Interac,UPI} or {Card}
   balance       numeric(12, 2),                    -- you update it; for a credit card = amount owed
   balance_date  date,
@@ -202,3 +202,8 @@ end $$;
 create index if not exists expenses_account_idx on public.expenses (account_id);
 create index if not exists card_payments_from_idx on public.card_payments (from_account_id);
 create index if not exists card_payments_to_idx on public.card_payments (to_account_id);
+
+-- Account types (also applied to databases created before savings was added)
+alter table public.accounts drop constraint if exists accounts_kind_check;
+alter table public.accounts add constraint accounts_kind_check
+  check (kind in ('chequing', 'savings', 'credit_card', 'cash'));

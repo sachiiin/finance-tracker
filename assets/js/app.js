@@ -88,7 +88,7 @@ function jobDuration(j) {
 }
 // A job is "active" unless it has an end date in the past (completed).
 const isActiveJob = j => !!j && (j.is_current || !j.end_date || j.end_date >= todayISO());
-const ACCOUNT_KINDS = { chequing: 'Chequing', credit_card: 'Credit card', cash: 'Cash' };
+const ACCOUNT_KINDS = { chequing: 'Chequing', savings: 'Savings', credit_card: 'Credit card', cash: 'Cash' };
 const DEFAULT_CATEGORIES = ['Groceries', 'Rent', 'Phone & Internet', 'Transport', 'Gas', 'Food & Dining', 'Shopping',
   'Bills & Utilities', 'Health', 'Subscriptions', 'Gifts', 'Other'];
 const uniq = list => [...new Set(list.filter(Boolean))];
@@ -280,7 +280,7 @@ const FORMS = {
       { k: 'repaid_date', label: 'Date returned', type: 'date', req: true, def: todayISO, half: true },
       { ...moneyField('amount', 'Amount (CAD)'), half: true },
       { k: 'note', label: 'Note', type: 'text' },
-      accountField('account_id', 'Received into', { kinds: ['chequing', 'cash'] }),
+      accountField('account_id', 'Received into', { kinds: ['chequing', 'savings', 'cash'] }),
       methodField(),
     ],
   },
@@ -321,7 +321,7 @@ const FORMS = {
       { k: 'payment_date', label: 'Date', type: 'date', req: true, def: todayISO, half: true },
       { ...moneyField('amount', 'Amount (CAD)'), half: true },
       accountField('to_account_id', 'Credit card', { kinds: ['credit_card'], req: true }),
-      accountField('from_account_id', 'Paid from', { kinds: ['chequing', 'cash'] }),
+      accountField('from_account_id', 'Paid from', { kinds: ['chequing', 'savings', 'cash'] }),
       { k: 'method', label: 'How', type: 'select', half: true, def: 'Auto Pay', options: () => [['Auto Pay', 'Auto Pay'], ['Manual', 'Manual']] },
       { k: 'note', label: 'Note', type: 'text', half: true },
     ],
@@ -951,7 +951,7 @@ function renderAccounts() {
   $('#view').innerHTML = `
     ${pageHead('Accounts', 'Your bank accounts, credit cards and cash · update balances whenever you check them', { label: 'Add Account', action: 'add', attrs: 'data-table="accounts"' })}
     <div class="row">
-      ${statCard('Cash on hand', cad(cashTotal), `${cashAccs.length} chequing / cash`, ICON.bank, 'success')}
+      ${statCard('Cash on hand', cad(cashTotal), `${cashAccs.length} bank / cash`, ICON.bank, 'success')}
       ${statCard('Credit cards owed', cad(owed), `${cards.length} card${cards.length === 1 ? '' : 's'}`, ICON.card, owed > 0 ? 'danger' : 'success')}
       ${statCard('Net', cad(cashTotal - owed), 'Cash on hand − cards owed', ICON.cash, cashTotal - owed >= 0 ? 'primary' : 'danger')}
     </div>

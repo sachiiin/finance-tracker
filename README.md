@@ -11,7 +11,7 @@ Static site (no build step) → **Vercel**, data → **Supabase**, installable o
 | 10th-20th Bhaag *(goes out)* | Auto-calculated per month from net pay + CRA/Other. % is adjustable per row (10, 20, anything). Donations you give are recorded here and the balance is shown |
 | India Payment *(goes out)* | Sr., Date, CAD, CA Account, Rate (auto = INR ÷ CAD, 2 decimals), INR, Comments. Loan tracker: Total loan − Total received (INR) = Remaining loan |
 | Money Lent | Sr., Name, Description, Amount, Due Date + status (Pending / Partial / Returned / Overdue) and partial repayments |
-| Accounts | Chequing, credit cards and cash with payment methods; update balances to see cash on hand, cards owed and net |
+| Accounts | Chequing, savings, credit cards and cash with payment methods; update balances to see cash on hand, cards owed and net |
 | Expenses | Everyday spending by account, method and category, plus credit card payments (not counted as spending) |
 
 Every table supports Add, Edit and Delete. A year selector at the top filters every tab except Money Lent (which always shows everything outstanding).
@@ -86,6 +86,7 @@ If you already ran `schema.sql`, run the files in `supabase/migrations/` that yo
 - `002_settings.sql` adds the settings table used by the India loan tracker (total loan amount).
 - `003_display_name.sql` adds your display name (shown in the top bar instead of your email).
 - `004_accounts_expenses.sql` adds accounts, expenses and credit card payments, plus account / payment method on India payments, donations and money lent.
+- `005_savings_accounts.sql` adds Savings as an account type.
 
 ## Updating the app
 

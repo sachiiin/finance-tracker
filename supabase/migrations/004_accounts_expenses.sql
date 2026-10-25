@@ -5,7 +5,7 @@ create table if not exists public.accounts (
   id            bigint generated always as identity primary key,
   user_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
   name          text not null,
-  kind          text not null default 'chequing' check (kind in ('chequing', 'credit_card', 'cash')),
+  kind          text not null default 'chequing' check (kind in ('chequing', 'savings', 'credit_card', 'cash')),
   methods       text[] not null default '{}',     -- e.g. {Interac,UPI} or {Card}
   balance       numeric(12, 2),                    -- you update it; for a credit card = amount owed
   balance_date  date,
