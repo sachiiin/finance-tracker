@@ -6,3 +6,4 @@ node_modules
 assets/js/config.js
 .env
 .env.*
+dist
