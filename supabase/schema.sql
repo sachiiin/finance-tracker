@@ -131,3 +131,4 @@ drop policy if exists "own rows" on public.settings;
 create policy "own rows" on public.settings for all to authenticated
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
+alter table public.settings add column if not exists display_name text;

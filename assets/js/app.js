@@ -247,6 +247,10 @@ const FORMS = {
       { k: 'note', label: 'Note', type: 'text' },
     ],
   },
+  display_name: {
+    title: 'Name',
+    fields: [{ k: 'display_name', label: 'Your name', type: 'text', req: true, help: 'Shown at the top instead of your email.' }],
+  },
   india_loan: {
     title: 'Total Loan Amount',
     fields: [{ ...moneyField('india_loan_inr', 'Total education loan (INR)'), help: 'The full loan amount. Remaining = this − total INR received in India Payments.' }],
@@ -869,14 +873,7 @@ document.addEventListener('click', e => {
     render();
   } else if (a === 'edit-loan') {
     openForm('india_loan', state.settings || { india_loan_inr: null }, {
-      async onSave({ india_loan_inr }) {
-        const q = state.settings
-          ? sb.from('settings').update({ india_loan_inr }).eq('user_id', state.user.id)
-          : sb.from('settings').insert({ india_loan_inr });
-        const { error } = await q;
-        if (error) throw error;
-        await loadSettings();
-      },
+      onSave: ({ india_loan_inr }) => saveSettings({ india_loan_inr }),
     });
     if (!state.settings) $('#formTitle').textContent = 'Set Total Loan Amount';
   } else if (a === 'repayments') {
@@ -904,6 +901,10 @@ document.addEventListener('click', e => {
       },
     });
     $('#formTitle').textContent = `Bhaag % – ${g.source} (${monthLabel(g.month)})`;
+  } else if (a === 'edit-name') {
+    openForm('display_name', { display_name: displayName() }, {
+      async onSave({ display_name }) { await saveSettings({ display_name }); renderUser(); },
+    });
   } else if (a === 'signout') {
     sb.auth.signOut();
   }
@@ -953,12 +954,33 @@ async function startApp(session) {
     $('#view').innerHTML = `<div class="alert alert-danger mt-4">Could not load data: ${esc(err.message)}.<br>Check that <code>supabase/schema.sql</code> has been run and <code>config.js</code> has the right project URL and key.</div>`;
     return;
   }
-  const email = session.user.email || '';
-  $('#userEmail').textContent = email;
-  $('#mobileUserEmail').textContent = email;
-  $('#userInitial').textContent = (email[0] || 'S').toUpperCase();
+  renderUser();
   show('appView');
   render();
+}
+
+// Name shown in the top bar: your saved name, else the name on your Supabase account, else the part of the email before @.
+function displayName() {
+  const meta = state.user?.user_metadata || {};
+  return (state.settings?.display_name || meta.full_name || meta.display_name || meta.name
+    || (state.user?.email || '').split('@')[0] || 'Me').trim();
+}
+function renderUser() {
+  const name = displayName();
+  $('#userName').textContent = name;
+  $('#mobileUserName').textContent = name;
+  $('#userInitial').textContent = (name[0] || 'S').toUpperCase();
+  $('#userEmailSmall').textContent = state.user?.email || '';
+}
+
+// Save fields to this user's settings row (creates it the first time).
+async function saveSettings(patch) {
+  const q = state.settings
+    ? sb.from('settings').update(patch).eq('user_id', state.user.id)
+    : sb.from('settings').insert(patch);
+  const { error } = await q;
+  if (error) throw error;
+  await loadSettings();
 }
 
 function stopApp() {

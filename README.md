@@ -82,6 +82,7 @@ If you already ran `schema.sql`, run the files in `supabase/migrations/` that yo
 
 - `001_job_dates.sql` adds Start / End dates to jobs.
 - `002_settings.sql` adds the settings table used by the India loan tracker (total loan amount).
+- `003_display_name.sql` adds your display name (shown in the top bar instead of your email).
 
 ## Updating the app
 

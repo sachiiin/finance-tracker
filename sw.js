@@ -1,7 +1,7 @@
 // Service worker: caches the app shell so the app installs and opens fast.
 // Data always comes live from Supabase (never cached here).
 // Bump CACHE when you change any file below so phones pick up the update.
-const CACHE = 'finance-v6';
+const CACHE = 'finance-v7';
 const SHELL = [
   '/',
   '/index.html',

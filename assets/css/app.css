@@ -68,7 +68,7 @@ body { background: #F2F4F6; }
 
 /* Top bar fixes */
 #yearSelect { min-width: 8.5rem; padding-right: 2.25rem; }
-#userEmail { color: #1F2937 !important; }
+#userName { color: #1F2937 !important; }
 
 /* Dashboard: income-by-source legend (HTML, never cropped) */
 .chart-box.pie { height: 220px; }
