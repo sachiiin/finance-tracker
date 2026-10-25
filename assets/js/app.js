@@ -31,6 +31,9 @@ const TABLES = {
   india_payments:  { order: 'payment_date' },
   loans:           { order: 'created_at' },
   loan_repayments: { order: 'repaid_date' },
+  accounts:        { order: 'sort_order', asc: true },
+  expenses:        { order: 'expense_date' },
+  card_payments:   { order: 'payment_date' },
 };
 
 const state = {
@@ -85,6 +88,31 @@ function jobDuration(j) {
 }
 // A job is "active" unless it has an end date in the past (completed).
 const isActiveJob = j => !!j && (j.is_current || !j.end_date || j.end_date >= todayISO());
+const ACCOUNT_KINDS = { chequing: 'Chequing', credit_card: 'Credit card', cash: 'Cash' };
+const DEFAULT_CATEGORIES = ['Groceries', 'Rent', 'Phone & Internet', 'Transport', 'Gas', 'Food & Dining', 'Shopping',
+  'Bills & Utilities', 'Health', 'Subscriptions', 'Gifts', 'Other'];
+const uniq = list => [...new Set(list.filter(Boolean))];
+const accountById = id => state.accounts.find(a => a.id === Number(id));
+// "Neo Chequing · Interac"
+const paidVia = r => {
+  const name = accountById(r.account_id)?.name;
+  return [name, r.method !== name ? r.method : null].filter(Boolean).join(' · ');
+};
+function methodOptions(accountId, keep) {
+  const list = [...(accountById(accountId)?.methods || [])];
+  if (keep && !list.includes(keep)) list.push(keep);
+  return list.map(m => [m, m]);
+}
+// Account dropdown (kinds limits the list; the row's own account always stays selectable)
+const accountField = (k, label, { kinds = null, req = false, half = true } = {}) => ({
+  k, label, type: 'select', numeric: true, req, half,
+  options: row => state.accounts.filter(a => !kinds || kinds.includes(a.kind) || a.id === row?.[k]).map(a => [a.id, a.name]),
+});
+// Payment-method dropdown that follows the chosen account
+const methodField = (from = 'account_id') => ({
+  k: 'method', label: 'Payment method', type: 'select', half: true, methodFor: from,
+  options: row => methodOptions(row?.[from], row?.method),
+});
 const jobLabel = j => j ? `${j.title} – ${j.employer}` : 'Unknown job';
 
 function toast(msg, type = 'ok') {
@@ -96,6 +124,8 @@ function toast(msg, type = 'ok') {
 }
 
 const ICON = {
+  card: '<svg class="icon" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>',
+  bag: '<svg class="icon" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/></svg>',
   edit: '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>',
   del:  '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>',
   plus: '<svg class="icon icon-xs me-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>',
@@ -207,6 +237,8 @@ const FORMS = {
       { k: 'donation_date', label: 'Date', type: 'date', req: true, def: todayISO, half: true },
       { ...moneyField('amount', 'Amount (CAD)'), half: true },
       { k: 'description', label: 'Description', type: 'text', placeholder: 'e.g. Mandir – October bhaag' },
+      accountField('account_id', 'Paid from'),
+      methodField(),
     ],
   },
   india_payments: {
@@ -216,7 +248,8 @@ const FORMS = {
       { ...moneyField('cad_amount', 'CAD amount'), half: true },
       { ...moneyField('inr_amount', 'INR amount'), half: true },
       { k: 'rate', label: 'Rate (INR per CAD)', type: 'number', readonly: true, help: 'Calculated as INR ÷ CAD.' },
-      { k: 'ca_account', label: 'CA account', type: 'text', placeholder: 'Account sent from', list: () => [...new Set(state.india_payments.map(p => p.ca_account).filter(Boolean))] },
+      accountField('account_id', 'CA account (sent from)'),
+      methodField(),
       { k: 'comments', label: 'Comments', type: 'textarea' },
     ],
     onInput(form, changed) {
@@ -237,6 +270,8 @@ const FORMS = {
       { k: 'description', label: 'Description', type: 'text' },
       { ...moneyField('amount', 'Amount (CAD)'), half: true },
       { k: 'due_date', label: 'Due date', type: 'date', half: true },
+      accountField('account_id', 'Given from'),
+      methodField(),
     ],
   },
   loan_repayments: {
@@ -245,7 +280,52 @@ const FORMS = {
       { k: 'repaid_date', label: 'Date returned', type: 'date', req: true, def: todayISO, half: true },
       { ...moneyField('amount', 'Amount (CAD)'), half: true },
       { k: 'note', label: 'Note', type: 'text' },
+      accountField('account_id', 'Received into', { kinds: ['chequing', 'cash'] }),
+      methodField(),
     ],
+  },
+  accounts: {
+    title: 'Account',
+    fields: [
+      { k: 'name', label: 'Account name', type: 'text', req: true, placeholder: 'e.g. Neo Chequing' },
+      { k: 'kind', label: 'Type', type: 'select', req: true, half: true, options: () => Object.entries(ACCOUNT_KINDS) },
+      { k: 'sort_order', label: 'Display order', type: 'number', step: '1', half: true, def: () => state.accounts.length + 1 },
+      { k: 'methods', label: 'Payment methods', type: 'text', placeholder: 'e.g. Interac, UPI',
+        help: 'Separate with commas. These are offered when you pick this account in a form.',
+        fromDb: v => (v || []).join(', '), toDb: v => (v ? v.split(',').map(m => m.trim()).filter(Boolean) : []) },
+      { k: 'balance', label: 'Current balance (CAD)', type: 'number', step: '0.01', half: true, help: 'Credit card: the amount you owe.' },
+      { k: 'balance_date', label: 'Balance as of', type: 'date', half: true, def: todayISO },
+    ],
+  },
+  account_balance: {
+    title: 'Balance',
+    fields: [
+      { k: 'balance', label: 'Balance (CAD)', type: 'number', step: '0.01', req: true, half: true },
+      { k: 'balance_date', label: 'As of', type: 'date', req: true, half: true },
+    ],
+  },
+  expenses: {
+    title: 'Expense',
+    fields: [
+      { k: 'expense_date', label: 'Date', type: 'date', req: true, def: todayISO, half: true },
+      { ...moneyField('amount', 'Amount (CAD)'), half: true },
+      { k: 'description', label: 'Description', type: 'text', req: true, placeholder: 'e.g. No Frills', list: () => uniq(state.expenses.map(e => e.description)) },
+      { k: 'category', label: 'Category', type: 'text', placeholder: 'e.g. Groceries', list: () => uniq([...DEFAULT_CATEGORIES, ...state.expenses.map(e => e.category)]) },
+      accountField('account_id', 'Paid from', { req: true }),
+      methodField(),
+    ],
+  },
+  card_payments: {
+    title: 'Card Payment',
+    fields: [
+      { k: 'payment_date', label: 'Date', type: 'date', req: true, def: todayISO, half: true },
+      { ...moneyField('amount', 'Amount (CAD)'), half: true },
+      accountField('to_account_id', 'Credit card', { kinds: ['credit_card'], req: true }),
+      accountField('from_account_id', 'Paid from', { kinds: ['chequing', 'cash'] }),
+      { k: 'method', label: 'How', type: 'select', half: true, def: 'Auto Pay', options: () => [['Auto Pay', 'Auto Pay'], ['Manual', 'Manual']] },
+      { k: 'note', label: 'Note', type: 'text', half: true },
+    ],
+    validate: v => (v.from_account_id && v.from_account_id === v.to_account_id ? 'Pick two different accounts.' : null),
   },
   display_name: {
     title: 'Name',
@@ -288,7 +368,9 @@ function fieldHTML(f, value) {
     input = `<input class="form-control${f.readonly ? ' bg-gray-100' : ''}" type="${f.type}" id="${id}" name="${f.k}" value="${esc(v)}" ${extra} ${list} ${req}>`;
     if (f.list) input += `<datalist id="${id}_list">${f.list().map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
   }
-  return `<div class="${f.half ? 'col-6' : 'col-12'}">
+  // Half-width dropdowns stack on phones so long account names are not cut off
+  const col = !f.half ? 'col-12' : f.type === 'select' ? 'col-12 col-sm-6' : 'col-6';
+  return `<div class="${col}">
     <label class="form-label" for="${id}">${esc(f.label)}${f.req ? ' <span class="text-danger">*</span>' : ''}</label>
     ${input}
     ${f.help ? `<div class="form-text">${esc(f.help)}</div>` : ''}
@@ -306,8 +388,10 @@ function openForm(kind, row = null, opts = {}) {
   $('#formTitle').textContent = `${row ? 'Edit' : 'Add'} ${cfg.title}`;
   $('#formBody').innerHTML = `<div class="row g-3">${cfg.fields.map(f => {
     let v = row ? row[f.k] : (opts.defaults?.[f.k] ?? (typeof f.def === 'function' ? f.def() : f.def));
+    if (f.fromDb) v = f.fromDb(v);
     return fieldHTML(f, v);
   }).join('')}</div>`;
+  syncMethods(cfg, $('#entityForm').elements, null);
   $('#formError').classList.add('d-none');
   $('#entityForm').classList.remove('was-validated');
   formModal().show();
@@ -321,8 +405,21 @@ function readForm(cfg, form) {
     else if (el.value === '') out[f.k] = null;
     else if (f.type === 'number' || f.numeric) out[f.k] = Number(el.value);
     else out[f.k] = el.value.trim();
+    if (f.toDb) out[f.k] = f.toDb(out[f.k]);
   }
   return out;
+}
+
+// Refill each payment-method dropdown from its account's methods.
+// changed = null on open (keeps the saved method), or the field the user just changed.
+function syncMethods(cfg, form, changed) {
+  for (const f of cfg.fields.filter(x => x.methodFor && (!changed || changed === x.methodFor))) {
+    const sel = form[f.k];
+    const cur = sel.value;
+    const opts = methodOptions(form[f.methodFor].value, changed ? null : cur);
+    sel.innerHTML = '<option value="">Select…</option>' + opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+    sel.value = opts.some(o => o[0] === cur) ? cur : (opts.length === 1 ? opts[0][0] : '');
+  }
 }
 
 async function submitForm(e) {
@@ -368,14 +465,15 @@ async function removeRow(table, id, what) {
   }
   await load(table);
   if (table === 'loans') await load('loan_repayments');
+  if (table === 'accounts') await Promise.all(['india_payments', 'donations', 'loans', 'loan_repayments'].map(load));
   toast(`${what[0].toUpperCase() + what.slice(1)} deleted`);
   render();
 }
 
 /* ════════════════════════════ UI pieces ════════════════════════════ */
 
-function statCard(label, value, sub, icon, tone = 'primary') {
-  return `<div class="col-12 col-sm-6 col-xl-4 mb-4">
+function statCard(label, value, sub, icon, tone = 'primary', col = 'col-12 col-sm-6 col-xl-4') {
+  return `<div class="${col} mb-4">
     <div class="card border-0 shadow stat-card h-100"><div class="card-body d-flex align-items-center">
       <div class="icon-shape icon-shape-${tone} rounded me-3">${icon}</div>
       <div class="min-w-0">
@@ -430,6 +528,7 @@ function destroyCharts() {
 
 /* ════════════════════════════ Pages ════════════════════════════ */
 
+const C4 = 'col-12 col-sm-6 col-xl-3';
 function renderDashboard() {
   const income = incomeRows().filter(r => inYear(r.date));
   const jobIncome = sum(income.filter(r => r.kind === 'job'), 'amount');
@@ -445,19 +544,24 @@ function renderDashboard() {
   const outstanding = sum(loans, l => Math.max(l.balance, 0));
   const openLoans = loans.filter(l => l.balance > 0);
   const hours = sum(state.paystubs.filter(p => inYear(p.pay_date)), 'hours');
+  const expenses = state.expenses.filter(e => inYear(e.expense_date));
+  const spent = sum(expenses, 'amount');
+  const cashOnHand = sum(state.accounts.filter(a => a.kind !== 'credit_card'), 'balance');
+  const cardOwed = sum(state.accounts.filter(a => a.kind === 'credit_card'), 'balance');
 
   // Recent transactions
   const tx = [
     ...income.map(r => ({ date: r.date, type: r.kind === 'job' ? 'Job pay' : 'CRA / Other', desc: r.source, amount: r.amount, dir: 1 })),
     ...donations.map(d => ({ date: d.donation_date, type: 'Bhaag', desc: d.description || 'Temple donation', amount: num(d.amount), dir: -1 })),
-    ...india.map(p => ({ date: p.payment_date, type: 'India', desc: `${inr(p.inr_amount)}${p.ca_account ? ' · ' + p.ca_account : ''}`, amount: num(p.cad_amount), dir: -1 })),
+    ...india.map(p => ({ date: p.payment_date, type: 'India', desc: [inr(p.inr_amount), paidVia(p) || p.ca_account].filter(Boolean).join(' · '), amount: num(p.cad_amount), dir: -1 })),
+    ...expenses.map(e => ({ date: e.expense_date, type: 'Expense', desc: [e.description, e.category].filter(Boolean).join(' · '), amount: num(e.amount), dir: -1 })),
     ...state.loan_repayments.filter(r => inYear(r.repaid_date)).map(r => {
       const l = state.loans.find(x => x.id === r.loan_id);
       return { date: r.repaid_date, type: 'Returned', desc: l ? `From ${l.name}` : 'Loan repayment', amount: num(r.amount), dir: 1 };
     }),
   ].sort(byDateDesc('date')).slice(0, 10);
 
-  const typeBadge = { 'Job pay': 'bg-success', 'CRA / Other': 'bg-info', 'Bhaag': 'bg-secondary text-gray-800', 'India': 'bg-tertiary', 'Returned': 'bg-gray-600' };
+  const typeBadge = { 'Job pay': 'bg-success', 'CRA / Other': 'bg-info', 'Bhaag': 'bg-secondary text-gray-800', 'India': 'bg-tertiary', 'Returned': 'bg-gray-600', 'Expense': 'bg-danger' };
   const txRows = tx.map(t => `<tr>
     <td>${fmtDate(t.date)}</td>
     <td><span class="badge ${typeBadge[t.type]}">${t.type}</span></td>
@@ -481,12 +585,14 @@ function renderDashboard() {
   $('#view').innerHTML = `
     ${pageHead('Dashboard', `Overview · ${yearText()}`)}
     <div class="row">
-      ${statCard('Total income', cad(totalIncome), `${income.length} entries · ${+hours.toFixed(2)} hrs worked`, ICON.cash, 'success')}
-      ${statCard('Job income (net)', cad(jobIncome), `${state.paystubs.filter(p => inYear(p.pay_date)).length} pay stubs`, ICON.brief, 'primary')}
-      ${statCard('CRA / Other income', cad(otherIncome), `${state.other_income.filter(o => inYear(o.date_received)).length} entries`, ICON.bank, 'info')}
-      ${statCard('Bhaag balance', cad(bhaagDue - donated), `Due ${cad(bhaagDue)} · Given ${cad(donated)}`, ICON.heart, balanceTone)}
-      ${statCard('Sent to India', cad(indiaCad), inr(indiaInr), ICON.plane, 'tertiary')}
-      ${statCard('Money lent – outstanding', cad(outstanding), `${openLoans.length} open · ${openLoans.filter(l => l.overdue).length} overdue · all years`, ICON.user, 'secondary')}
+      ${statCard('Total income', cad(totalIncome), `${income.length} entries · ${+hours.toFixed(2)} hrs worked`, ICON.cash, 'success', C4)}
+      ${statCard('Job income (net)', cad(jobIncome), `${state.paystubs.filter(p => inYear(p.pay_date)).length} pay stubs`, ICON.brief, 'primary', C4)}
+      ${statCard('CRA / Other income', cad(otherIncome), `${state.other_income.filter(o => inYear(o.date_received)).length} entries`, ICON.bank, 'info', C4)}
+      ${statCard('Expenses', cad(spent), `${expenses.length} entries`, ICON.bag, 'danger', C4)}
+      ${statCard('Bhaag balance', cad(bhaagDue - donated), `Due ${cad(bhaagDue)} · Given ${cad(donated)}`, ICON.heart, balanceTone, C4)}
+      ${statCard('Sent to India', cad(indiaCad), inr(indiaInr), ICON.plane, 'tertiary', C4)}
+      ${statCard('Money lent – outstanding', cad(outstanding), `${openLoans.length} open · ${openLoans.filter(l => l.overdue).length} overdue · all years`, ICON.user, 'secondary', C4)}
+      ${statCard('Net cash (accounts)', cad(cashOnHand - cardOwed), `Cash ${cad(cashOnHand)} · Cards owed ${cad(cardOwed)}`, ICON.card, cashOnHand - cardOwed >= 0 ? 'success' : 'danger', C4)}
     </div>
     <div class="row">
       <div class="col-12 mb-4">
@@ -535,6 +641,7 @@ function drawDashboardCharts(income) {
         { label: 'Income', data: bucket(allIncome, 'date', 'amount'), backgroundColor: '#10B981', borderRadius: 4 },
         { label: 'Bhaag given', data: bucket(state.donations, 'donation_date', 'amount'), backgroundColor: '#f0bc74', borderRadius: 4 },
         { label: 'Sent to India', data: bucket(state.india_payments, 'payment_date', 'cad_amount'), backgroundColor: '#31316A', borderRadius: 4 },
+        { label: 'Expenses', data: bucket(state.expenses, 'expense_date', 'amount'), backgroundColor: '#E11D48', borderRadius: 4 },
       ],
     },
     options: {
@@ -709,9 +816,10 @@ function renderBhaag() {
 
   const donRows = dons.map((d, i) => `<tr>
     <td>${i + 1}</td><td>${fmtDate(d.donation_date)}</td><td class="text-wrap">${esc(d.description || '—')}</td>
+    <td class="small">${esc(paidVia(d) || '—')}</td>
     <td class="num fw-bold">${cad(d.amount)}</td>${actionBtns('donations', d.id, 'donation')}
   </tr>`).join('');
-  const donFoot = dons.length ? `<tr><td colspan="3">Total given</td><td class="num">${cad(given)}</td><td></td></tr>` : '';
+  const donFoot = dons.length ? `<tr><td colspan="4">Total given</td><td class="num">${cad(given)}</td><td></td></tr>` : '';
 
   $('#view').innerHTML = `
     ${pageHead('10th-20th Bhaag', `Calculated monthly from Jobs (net pay) and CRA/Other income · ${yearText()}`, { label: 'Record Donation', action: 'add', attrs: 'data-table="donations"' })}
@@ -721,7 +829,7 @@ function renderBhaag() {
       ${statCard(balance > 0 ? 'Balance still to give' : balance < 0 ? 'Given in advance' : 'All given',cad(Math.abs(balance)), `Given so far ${cad(given)}`, balance > 0 ? ICON.alert : ICON.check, balance > 0 ? 'danger' : 'success')}
     </div>
     ${tableCard('Monthly Bhaag', ['Sr.', 'Month', 'Description', ['Total amount', 'num'], ['%', 'num'], ['Bhaag amount', 'num'], ['', 'actions']], rows, foot)}
-    ${tableCard('Donations given', ['Sr.', 'Date', 'Description', ['Amount', 'num'], ['', 'actions']], donRows, donFoot)}`;
+    ${tableCard('Donations given', ['Sr.', 'Date', 'Description', 'Paid from', ['Amount', 'num'], ['', 'actions']], donRows, donFoot)}`;
 }
 
 function renderIndia() {
@@ -730,7 +838,7 @@ function renderIndia() {
   const html = rows.map((p, i) => `<tr>
     <td>${i + 1}</td><td>${fmtDate(p.payment_date)}</td>
     <td class="num fw-bold">${cad(p.cad_amount)}</td>
-    <td>${esc(p.ca_account || '—')}</td>
+    <td>${esc(paidVia(p) || p.ca_account || '—')}</td>
     <td class="num">${num(p.rate).toFixed(2)}</td>
     <td class="num fw-bold">${inr(p.inr_amount)}</td>
     <td class="text-wrap small">${esc(p.comments || '')}</td>
@@ -785,7 +893,7 @@ function renderLent() {
   const rows = loans.map((l, i) => `<tr class="${l.id === state.loanSel ? 'row-selected' : ''}">
     <td>${i + 1}</td>
     <td class="fw-bold">${esc(l.name)}</td>
-    <td class="text-wrap">${esc(l.description || '—')}</td>
+    <td class="text-wrap">${esc(l.description || '—')}${paidVia(l) ? `<div class="small text-gray-500">${esc(paidVia(l))}</div>` : ''}</td>
     <td class="num">${cad(l.amount)}</td>
     <td class="num">${cad(l.returned)}</td>
     <td class="num fw-bold">${cad(Math.max(l.balance, 0))}</td>
@@ -801,7 +909,7 @@ function renderLent() {
   if (sel) {
     const reps = [...sel.reps].sort(byDateDesc('repaid_date'));
     const repRows = reps.map((r, i) => `<tr><td>${i + 1}</td><td>${fmtDate(r.repaid_date)}</td><td class="num fw-bold">${cad(r.amount)}</td>
-      <td class="text-wrap">${esc(r.note || '')}</td>${actionBtns('loan_repayments', r.id, 'repayment')}</tr>`).join('');
+      <td class="text-wrap">${esc(r.note || '')}${paidVia(r) ? `<div class="small text-gray-500">${esc(paidVia(r))}</div>` : ''}</td>${actionBtns('loan_repayments', r.id, 'repayment')}</tr>`).join('');
     panel = `<div id="repayPanel">${tableCard(`Repayments from ${esc(sel.name)} <span class="small fw-normal text-gray-500">· balance ${cad(Math.max(sel.balance, 0))}</span>`,
       ['Sr.', 'Date', ['Amount', 'num'], 'Note', ['', 'actions']], repRows, '',
       `<div class="d-flex gap-2"><button class="btn btn-sm btn-gray-800" data-action="add-repayment" data-id="${sel.id}">${ICON.plus}Add Repayment</button>
@@ -820,9 +928,88 @@ function renderLent() {
     ${panel}`;
 }
 
+function renderAccounts() {
+  const month = todayISO().slice(0, 7);
+  const accs = state.accounts;
+  const cashAccs = accs.filter(a => a.kind !== 'credit_card');
+  const cards = accs.filter(a => a.kind === 'credit_card');
+  const cashTotal = sum(cashAccs, 'balance');
+  const owed = sum(cards, 'balance');
+  const rows = accs.map((a, i) => {
+    const spentMonth = sum(state.expenses.filter(e => e.account_id === a.id && monthKey(e.expense_date) === month), 'amount');
+    const isCard = a.kind === 'credit_card';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td class="text-wrap"><div class="fw-bold">${esc(a.name)}</div><div class="small text-gray-500">${ACCOUNT_KINDS[a.kind] || a.kind}</div></td>
+      <td class="small">${esc((a.methods || []).join(', ') || '—')}</td>
+      <td class="num fw-bold ${isCard && num(a.balance) > 0 ? 'text-danger' : ''}">${a.balance == null ? '—' : cad(a.balance)}${isCard && a.balance != null ? '<div class="small fw-normal text-gray-500">owed</div>' : ''}</td>
+      <td>${fmtDate(a.balance_date)}</td>
+      <td class="num">${cad(spentMonth)}</td>
+      ${actionBtns('accounts', a.id, 'account', `<button class="btn btn-sm btn-outline-gray-800 px-2 me-1" data-action="update-balance" data-id="${a.id}">Update balance</button>`)}
+    </tr>`;
+  }).join('');
+  $('#view').innerHTML = `
+    ${pageHead('Accounts', 'Your bank accounts, credit cards and cash · update balances whenever you check them', { label: 'Add Account', action: 'add', attrs: 'data-table="accounts"' })}
+    <div class="row">
+      ${statCard('Cash on hand', cad(cashTotal), `${cashAccs.length} chequing / cash`, ICON.bank, 'success')}
+      ${statCard('Credit cards owed', cad(owed), `${cards.length} card${cards.length === 1 ? '' : 's'}`, ICON.card, owed > 0 ? 'danger' : 'success')}
+      ${statCard('Net', cad(cashTotal - owed), 'Cash on hand − cards owed', ICON.cash, cashTotal - owed >= 0 ? 'primary' : 'danger')}
+    </div>
+    ${tableCard('Accounts', ['#', 'Account', 'Payment methods', ['Balance', 'num'], 'As of', [`Spent in ${MONTHS[+month.slice(5) - 1]}`, 'num'], ['', 'actions']], rows)}`;
+}
+
+function renderExpenses() {
+  const rows = state.expenses.filter(e => inYear(e.expense_date)).sort(byDateDesc('expense_date'));
+  const month = todayISO().slice(0, 7);
+  const thisMonth = sum(state.expenses.filter(e => monthKey(e.expense_date) === month), 'amount');
+  const total = sum(rows, 'amount');
+  const byCat = new Map();
+  rows.forEach(e => { const c = e.category || 'Other'; byCat.set(c, round2((byCat.get(c) || 0) + num(e.amount))); });
+  const cats = [...byCat].sort((a, b) => b[1] - a[1]);
+
+  const html = rows.map((e, i) => `<tr>
+    <td>${i + 1}</td><td>${fmtDate(e.expense_date)}</td>
+    <td class="text-wrap">${esc(e.description)}</td>
+    <td>${e.category ? `<span class="badge bg-gray-200 text-gray-800">${esc(e.category)}</span>` : '—'}</td>
+    <td class="small">${esc(paidVia(e) || '—')}</td>
+    <td class="num fw-bold">${cad(e.amount)}</td>
+    ${actionBtns('expenses', e.id, 'expense')}
+  </tr>`).join('');
+  const foot = rows.length ? `<tr><td colspan="5">Total (${rows.length})</td><td class="num">${cad(total)}</td><td></td></tr>` : '';
+
+  const catRows = cats.map(([c, amt]) => `<tr><td>${esc(c)}</td><td class="num fw-bold">${cad(amt)}</td><td class="num">${(amt / total * 100).toFixed(1)}%</td></tr>`).join('');
+
+  const pays = state.card_payments.filter(p => inYear(p.payment_date)).sort(byDateDesc('payment_date'));
+  const payRows = pays.map((p, i) => `<tr>
+    <td>${i + 1}</td><td>${fmtDate(p.payment_date)}</td>
+    <td>${esc(accountById(p.to_account_id)?.name || '—')}</td>
+    <td>${esc(accountById(p.from_account_id)?.name || '—')}</td>
+    <td>${esc(p.method || '—')}</td>
+    <td class="num fw-bold">${cad(p.amount)}</td>
+    ${actionBtns('card_payments', p.id, 'card payment')}
+  </tr>`).join('');
+  const payFoot = pays.length ? `<tr><td colspan="5">Total (${pays.length})</td><td class="num">${cad(sum(pays, 'amount'))}</td><td></td></tr>` : '';
+
+  $('#view').innerHTML = `
+    ${pageHead('Expenses', `Everyday spending by account and card · ${yearText()}`, { label: 'Add Expense', action: 'add', attrs: 'data-table="expenses"' })}
+    <div class="row">
+      ${statCard('Spent', cad(total), `${rows.length} expenses · ${yearText()}`, ICON.bag, 'danger')}
+      ${statCard(`This month (${MONTHS[+month.slice(5) - 1]})`, cad(thisMonth), '', ICON.clock, 'primary')}
+      ${statCard('Top category', cats.length ? esc(cats[0][0]) : '—', cats.length ? cad(cats[0][1]) : '', ICON.check, 'secondary')}
+    </div>
+    ${tableCard('Expenses', ['Sr.', 'Date', 'Description', 'Category', 'Paid from', ['Amount', 'num'], ['', 'actions']], html, foot)}
+    <div class="row">
+      <div class="col-12 col-lg-6">${tableCard('By category', ['Category', ['Amount', 'num'], ['Share', 'num']], catRows)}</div>
+      <div class="col-12">${tableCard('Credit card payments <span class="small fw-normal text-gray-500">· not counted as spending</span>',
+        ['Sr.', 'Date', 'Card', 'Paid from', 'How', ['Amount', 'num'], ['', 'actions']], payRows, payFoot,
+        `<button class="btn btn-sm btn-outline-gray-800" data-action="add" data-table="card_payments">${ICON.plus}Add Card Payment</button>`)}</div>
+    </div>`;
+}
+
 /* ════════════════════════════ Router ════════════════════════════ */
 
-const ROUTES = { dashboard: renderDashboard, jobs: renderJobs, other: renderOther, bhaag: renderBhaag, india: renderIndia, lent: renderLent };
+const ROUTES = { dashboard: renderDashboard, accounts: renderAccounts, jobs: renderJobs, other: renderOther, bhaag: renderBhaag,
+  india: renderIndia, expenses: renderExpenses, lent: renderLent };
 const currentRoute = () => {
   const r = location.hash.replace(/^#\/?/, '');
   return ROUTES[r] ? r : 'dashboard';
@@ -832,6 +1019,7 @@ function renderYearSelect() {
   const dates = [
     ...state.paystubs.map(p => p.pay_date), ...state.other_income.map(o => o.date_received),
     ...state.donations.map(d => d.donation_date), ...state.india_payments.map(p => p.payment_date),
+    ...state.expenses.map(e => e.expense_date), ...state.card_payments.map(p => p.payment_date),
     todayISO(),
   ];
   const years = [...new Set(dates.filter(Boolean).map(d => d.slice(0, 4)))].sort().reverse();
@@ -859,6 +1047,8 @@ document.addEventListener('click', e => {
   const { table, id } = el.dataset;
 
   if (a === 'add') {
+    if (table === 'expenses' && !state.accounts.length) return toast('Add an account first (Accounts tab).', 'error');
+    if (table === 'card_payments' && !state.accounts.some(x => x.kind === 'credit_card')) return toast('Add a credit card account first (Accounts tab).', 'error');
     if (table === 'paystubs' && !state.jobs.some(isActiveJob)) return toast('No active job. Add a job, or clear the end date of the job you work at now.', 'error');
     const active = state.jobs.filter(isActiveJob);
     const jobId = el.dataset.job ? Number(el.dataset.job) : (active.length === 1 ? active[0].id : null);
@@ -867,6 +1057,16 @@ document.addEventListener('click', e => {
     openForm(table, rowFor(table, id));
   } else if (a === 'delete') {
     removeRow(table, Number(id), el.dataset.what);
+  } else if (a === 'update-balance') {
+    const acc = rowFor('accounts', id);
+    openForm('account_balance', { balance: acc.balance, balance_date: todayISO() }, {
+      async onSave(v) {
+        const { error } = await sb.from('accounts').update(v).eq('id', acc.id);
+        if (error) throw error;
+        await load('accounts');
+      },
+    });
+    $('#formTitle').textContent = `Update balance – ${acc.name}`;
   } else if (a === 'toggle-job') {
     const jid = Number(id);
     state.openJobs.has(jid) ? state.openJobs.delete(jid) : state.openJobs.add(jid);
@@ -918,6 +1118,7 @@ $('#entityForm').addEventListener('submit', submitForm);
 $('#entityForm').addEventListener('input', e => {
   const cfg = formCtx && FORMS[formCtx.kind];
   cfg?.onInput?.(e.currentTarget.elements, e.target.name);
+  if (cfg) syncMethods(cfg, e.currentTarget.elements, e.target.name);
 });
 
 window.addEventListener('hashchange', () => {
