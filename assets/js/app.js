@@ -191,15 +191,20 @@ const FORMS = {
     fields: [
       { k: 'payment_date', label: 'Date', type: 'date', req: true, def: todayISO },
       { ...moneyField('cad_amount', 'CAD amount'), half: true },
-      { k: 'rate', label: 'Rate (INR per CAD)', type: 'number', step: '0.0001', min: '0', req: true, half: true },
-      { ...moneyField('inr_amount', 'INR amount'), help: 'Calculated as CAD × Rate. You can adjust it to match the actual credited amount.' },
+      { ...moneyField('inr_amount', 'INR amount'), half: true },
+      { k: 'rate', label: 'Rate (INR per CAD)', type: 'number', readonly: true, help: 'Calculated as INR ÷ CAD.' },
       { k: 'ca_account', label: 'CA account', type: 'text', placeholder: 'Account sent from', list: () => [...new Set(state.india_payments.map(p => p.ca_account).filter(Boolean))] },
       { k: 'comments', label: 'Comments', type: 'textarea' },
     ],
     onInput(form, changed) {
-      if (changed !== 'cad_amount' && changed !== 'rate') return;
-      const c = num(form.cad_amount.value), r = num(form.rate.value);
-      if (c && r) form.inr_amount.value = round2(c * r).toFixed(2);
+      if (changed !== 'cad_amount' && changed !== 'inr_amount') return;
+      const c = num(form.cad_amount.value), i = num(form.inr_amount.value);
+      form.rate.value = c > 0 && i > 0 ? (i / c).toFixed(4) : '';
+    },
+    validate(v) {
+      if (!(v.cad_amount > 0) || !(v.inr_amount > 0)) return 'CAD and INR amounts must both be more than 0.';
+      v.rate = Math.round(v.inr_amount / v.cad_amount * 10000) / 10000;
+      return null;
     },
   },
   loans: {
@@ -247,8 +252,9 @@ function fieldHTML(f, value) {
   } else {
     const list = f.list ? `list="${id}_list"` : '';
     const extra = [f.step && `step="${f.step}"`, f.min && `min="${f.min}"`, f.max && `max="${f.max}"`,
-      f.type === 'number' && 'inputmode="decimal"', f.placeholder && `placeholder="${esc(f.placeholder)}"`].filter(Boolean).join(' ');
-    input = `<input class="form-control" type="${f.type}" id="${id}" name="${f.k}" value="${esc(v)}" ${extra} ${list} ${req}>`;
+      f.type === 'number' && 'inputmode="decimal"', f.placeholder && `placeholder="${esc(f.placeholder)}"`,
+      f.readonly && 'readonly tabindex="-1"'].filter(Boolean).join(' ');
+    input = `<input class="form-control${f.readonly ? ' bg-gray-100' : ''}" type="${f.type}" id="${id}" name="${f.k}" value="${esc(v)}" ${extra} ${list} ${req}>`;
     if (f.list) input += `<datalist id="${id}_list">${f.list().map(o => `<option value="${esc(o)}">`).join('')}</datalist>`;
   }
   return `<div class="${f.half ? 'col-6' : 'col-12'}">

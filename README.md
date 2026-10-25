@@ -9,7 +9,7 @@ Static site (no build step) → **Vercel**, data → **Supabase**, installable o
 | Jobs *(comes in)* | Your 10 jobs (pre-loaded on first login) and their pay stubs: Sr., Pay Period, Pay Date, Hours, Net Pay |
 | CRA / Other Income *(comes in)* | Sr., Description, Date Received, Amount |
 | 10th-20th Bhaag *(goes out)* | Auto-calculated per month from net pay + CRA/Other. % is adjustable per row (10, 20, anything). Donations you give are recorded here and the balance is shown |
-| India Payment *(goes out)* | Sr., Date, CAD, CA Account, Rate, INR (auto = CAD × Rate, editable), Comments |
+| India Payment *(goes out)* | Sr., Date, CAD, CA Account, Rate (auto = INR ÷ CAD), INR, Comments |
 | Money Lent | Sr., Name, Description, Amount, Due Date + status (Pending / Partial / Returned / Overdue) and partial repayments |
 
 Every table supports Add, Edit and Delete. A year selector at the top filters every tab except Money Lent (which always shows everything outstanding).
