@@ -36,7 +36,8 @@ const TABLES = {
 const state = {
   user: null,
   year: 'all',
-  jobFilter: 'all',
+  openJobs: null,   // Set of expanded job ids on the Jobs tab (null = not set yet)
+  settings: null,   // this user's settings row (India loan total)
   loanSel: null,
   charts: [],
   ...Object.fromEntries(Object.keys(TABLES).map(t => [t, []])),
@@ -82,6 +83,8 @@ function jobDuration(j) {
   const end = j.end_date ? fmtDate(j.end_date) : (j.is_current ? 'Present' : '—');
   return `${j.start_date ? fmtDate(j.start_date) : '—'} – ${end}`;
 }
+// A job is "active" unless it has an end date in the past (completed).
+const isActiveJob = j => !!j && (j.is_current || !j.end_date || j.end_date >= todayISO());
 const jobLabel = j => j ? `${j.title} – ${j.employer}` : 'Unknown job';
 
 function toast(msg, type = 'ok') {
@@ -116,7 +119,12 @@ async function load(table) {
   if (error) throw error;
   state[table] = data || [];
 }
-const loadAll = () => Promise.all(Object.keys(TABLES).map(load));
+async function loadSettings() {
+  const { data, error } = await sb.from('settings').select('*');
+  if (error) throw error;
+  state.settings = (data && data[0]) || null;
+}
+const loadAll = () => Promise.all([...Object.keys(TABLES).map(load), loadSettings()]);
 
 async function seedJobsIfEmpty() {
   if (state.jobs.length) return;
@@ -172,7 +180,9 @@ const FORMS = {
   paystubs: {
     title: 'Pay Stub',
     fields: [
-      { k: 'job_id', label: 'Job', type: 'select', req: true, numeric: true, options: () => state.jobs.map(j => [j.id, jobLabel(j)]) },
+      // New stubs: active jobs only. Editing: also keep the stub's own (possibly completed) job.
+      { k: 'job_id', label: 'Job', type: 'select', req: true, numeric: true,
+        options: row => state.jobs.filter(j => isActiveJob(j) || j.id === row?.job_id).map(j => [j.id, jobLabel(j)]) },
       { k: 'period_start', label: 'Pay period start', type: 'date', half: true },
       { k: 'period_end', label: 'Pay period end', type: 'date', half: true },
       { k: 'pay_date', label: 'Pay date', type: 'date', req: true, def: todayISO },
@@ -212,11 +222,11 @@ const FORMS = {
     onInput(form, changed) {
       if (changed !== 'cad_amount' && changed !== 'inr_amount') return;
       const c = num(form.cad_amount.value), i = num(form.inr_amount.value);
-      form.rate.value = c > 0 && i > 0 ? (i / c).toFixed(4) : '';
+      form.rate.value = c > 0 && i > 0 ? (i / c).toFixed(2) : '';
     },
     validate(v) {
       if (!(v.cad_amount > 0) || !(v.inr_amount > 0)) return 'CAD and INR amounts must both be more than 0.';
-      v.rate = Math.round(v.inr_amount / v.cad_amount * 10000) / 10000;
+      v.rate = Math.round(v.inr_amount / v.cad_amount * 100) / 100;
       return null;
     },
   },
@@ -237,6 +247,10 @@ const FORMS = {
       { k: 'note', label: 'Note', type: 'text' },
     ],
   },
+  india_loan: {
+    title: 'Total Loan Amount',
+    fields: [{ ...moneyField('india_loan_inr', 'Total education loan (INR)'), help: 'The full loan amount. Remaining = this − total INR received in India Payments.' }],
+  },
   bhaag_percent: {
     title: 'Bhaag %',
     fields: [{ ...pctField, help: 'Applies to every income entry in this row.' }],
@@ -254,7 +268,7 @@ function fieldHTML(f, value) {
   if (f.type === 'select') {
     input = `<select class="form-select" id="${id}" name="${f.k}" ${req}>
       <option value="">Select…</option>
-      ${f.options().map(([val, lab]) => `<option value="${esc(val)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(lab)}</option>`).join('')}
+      ${f.options(formCtx?.row).map(([val, lab]) => `<option value="${esc(val)}" ${String(val) === String(v) ? 'selected' : ''}>${esc(lab)}</option>`).join('')}
     </select>`;
   } else if (f.type === 'checkbox') {
     return `<div class="${f.half ? 'col-6' : 'col-12'}"><div class="form-check">
@@ -471,18 +485,18 @@ function renderDashboard() {
       ${statCard('Money lent – outstanding', cad(outstanding), `${openLoans.length} open · ${openLoans.filter(l => l.overdue).length} overdue · all years`, ICON.user, 'secondary')}
     </div>
     <div class="row">
-      <div class="col-12 col-xl-8 mb-4">
-        <div class="card border-0 shadow h-100">
+      <div class="col-12 mb-4">
+        <div class="card border-0 shadow">
           <div class="card-header"><h2 class="fs-5 fw-bold mb-0">Monthly money in vs out</h2>
             <div class="small text-gray-500">${state.year === 'all' ? 'Last 12 months' : state.year}</div></div>
           <div class="card-body"><div class="chart-box"><canvas id="barChart"></canvas></div></div>
         </div>
       </div>
-      <div class="col-12 col-xl-4 mb-4">
-        <div class="card border-0 shadow h-100">
+      <div class="col-12 mb-4">
+        <div class="card border-0 shadow">
           <div class="card-header"><h2 class="fs-5 fw-bold mb-0">Income by source</h2>
             <div class="small text-gray-500">${yearText()}</div></div>
-          <div class="card-body"><div class="chart-box pie"><canvas id="pieChart"></canvas></div></div>
+          <div class="card-body"><div class="pie-wrap"><div class="chart-box pie"><canvas id="pieChart"></canvas></div><ul class="pie-legend" id="pieLegend"></ul></div></div>
         </div>
       </div>
     </div>
@@ -544,64 +558,83 @@ function drawDashboardCharts(income) {
     data: { labels: entries.map(e => e[0]), datasets: [{ data: entries.map(e => e[1]), backgroundColor: entries.map((_, i) => PALETTE[i % PALETTE.length]), borderWidth: 2 }] },
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '60%',
-      plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+      plugins: { legend: { display: false },
         tooltip: { callbacks: { label: c => `${c.label}: ${cad(c.parsed)}` } } },
     },
   });
+  // Own legend under the chart: never cropped, shows amount and share
+  const totalIn = entries.reduce((a, e) => a + e[1], 0);
+  $('#pieLegend').innerHTML = entries.map(([label, amt], i) => `<li>
+    <span class="dot" style="background:${PALETTE[i % PALETTE.length]}"></span>
+    <span class="lbl">${esc(label)}</span>
+    <span class="amt">${cad(amt)}</span>
+    <span class="pct">${(amt / totalIn * 100).toFixed(1)}%</span></li>`).join('');
   state.charts.push(bar, pie);
 }
 
 function renderJobs() {
-  const jf = state.jobFilter;
-  const stubs = state.paystubs
-    .filter(p => inYear(p.pay_date) && (jf === 'all' || p.job_id === Number(jf)))
-    .sort(byDateDesc('pay_date'));
-  const showJobCol = jf === 'all';
-  const selJob = jf === 'all' ? null : jobById(Number(jf));
+  if (!state.openJobs) state.openJobs = new Set(state.jobs.filter(j => j.is_current).map(j => j.id));
+  const yearStubs = state.paystubs.filter(p => inYear(p.pay_date));
 
-  const rows = stubs.map((p, i) => `<tr>
-    <td>${i + 1}</td>
-    ${showJobCol ? `<td class="text-wrap"><div class="fw-bold">${esc(jobById(p.job_id)?.title)}</div><div class="small text-gray-500">${esc(jobById(p.job_id)?.employer)}</div></td>` : ''}
-    <td>${p.period_start || p.period_end ? `${fmtDate(p.period_start)} – ${fmtDate(p.period_end)}` : '—'}</td>
-    <td>${fmtDate(p.pay_date)}</td>
-    <td class="num">${p.hours != null ? +num(p.hours).toFixed(2) : '—'}</td>
-    <td class="num fw-bold">${cad(p.net_pay)}</td>
-    ${actionBtns('paystubs', p.id, 'pay stub')}
-  </tr>`).join('');
-  const foot = stubs.length ? `<tr><td colspan="${showJobCol ? 4 : 3}">Total (${stubs.length})</td>
-    <td class="num">${+sum(stubs, 'hours').toFixed(2)}</td><td class="num">${cad(sum(stubs, 'net_pay'))}</td><td></td></tr>` : '';
-
-  const filter = `<select class="form-select form-select-sm w-auto" id="jobFilter" aria-label="Filter by job">
-    <option value="all">All jobs</option>
-    ${state.jobs.map(j => `<option value="${j.id}" ${String(j.id) === String(jf) ? 'selected' : ''}>${esc(jobLabel(j))}</option>`).join('')}
-  </select>`;
-
-  const jobsRows = state.jobs.map((j, i) => {
-    const s = state.paystubs.filter(p => p.job_id === j.id);
-    return `<tr class="${String(j.id) === String(jf) ? 'row-selected' : ''}">
-      <td>${i + 1}</td>
-      <td class="text-wrap"><a href="#" class="fw-bold text-gray-800" data-action="pick-job" data-id="${j.id}">${esc(j.title)}</a>
-        ${j.is_current ? '<span class="badge bg-success ms-1">Current</span>' : ''}<div class="small text-gray-500">${esc(j.employer)}</div></td>
-      <td>${esc(j.location || '—')}</td>
-      <td>${esc(j.job_type)}</td>
-      <td>${jobDuration(j)}</td>
-      <td class="num">${s.length}</td>
-      <td class="num fw-bold">${cad(sum(s, 'net_pay'))}</td>
-      ${actionBtns('jobs', j.id, 'job')}
-    </tr>`;
+  const jobItems = state.jobs.map((j, i) => {
+    const stubs = yearStubs.filter(p => p.job_id === j.id).sort(byDateDesc('pay_date'));
+    const open = state.openJobs.has(j.id);
+    const active = isActiveJob(j);
+    const rows = stubs.map((p, k) => `<tr>
+      <td>${k + 1}</td>
+      <td>${p.period_start || p.period_end ? `${fmtDate(p.period_start)} – ${fmtDate(p.period_end)}` : '—'}</td>
+      <td>${fmtDate(p.pay_date)}</td>
+      <td class="num">${p.hours != null ? +num(p.hours).toFixed(2) : '—'}</td>
+      <td class="num fw-bold">${cad(p.net_pay)}</td>
+      ${actionBtns('paystubs', p.id, 'pay stub')}
+    </tr>`).join('');
+    const body = !open ? '' : `<div class="job-body">
+      <div class="table-responsive"><table class="table mb-0">
+        <thead class="thead-light"><tr><th class="border-0">Sr.</th><th class="border-0">Pay period</th><th class="border-0">Pay date</th>
+          <th class="border-0 num">Hours</th><th class="border-0 num">Amount</th><th class="border-0 actions"></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="6" class="empty-state">No pay stubs${state.year === 'all' ? '' : ' in ' + state.year}.</td></tr>`}</tbody>
+        ${stubs.length ? `<tfoot><tr><td colspan="3">Total (${stubs.length})</td><td class="num">${+sum(stubs, 'hours').toFixed(2)}</td><td class="num">${cad(sum(stubs, 'net_pay'))}</td><td></td></tr></tfoot>` : ''}
+      </table></div>
+      <div class="job-tools">
+        ${active ? `<button class="btn btn-sm btn-gray-800" data-action="add" data-table="paystubs" data-job="${j.id}">${ICON.plus}Add Pay Stub</button>` : '<span class="small text-gray-500">Completed job – new pay stubs are only added to active jobs.</span>'}
+        <span class="ms-auto">
+          <button class="btn btn-sm btn-outline-gray-600 btn-icon" data-action="edit" data-table="jobs" data-id="${j.id}" title="Edit job" aria-label="Edit job">${ICON.edit}</button>
+          <button class="btn btn-sm btn-outline-danger btn-icon ms-1" data-action="delete" data-table="jobs" data-id="${j.id}" data-what="job" title="Delete job" aria-label="Delete job">${ICON.del}</button>
+        </span>
+      </div>
+    </div>`;
+    return `<div class="job-item ${open ? 'open' : ''}">
+      <button type="button" class="job-head" data-action="toggle-job" data-id="${j.id}" aria-expanded="${open}">
+        <span class="job-chevron" aria-hidden="true">›</span>
+        <span class="job-main">
+          <span class="fw-bold text-gray-800">${i + 1}. ${esc(j.title)}</span>
+          ${j.is_current ? '<span class="badge bg-success ms-1">Current</span>' : (!active ? '<span class="badge bg-gray-200 text-gray-700 ms-1">Completed</span>' : '')}
+          <span class="d-block small text-gray-500">${esc(j.employer)}${j.location ? ' · ' + esc(j.location) : ''} · ${esc(j.job_type)}</span>
+          <span class="d-block small text-gray-500">${jobDuration(j)}</span>
+        </span>
+        <span class="job-sum">
+          <span class="fw-bold d-block">${cad(sum(stubs, 'net_pay'))}</span>
+          <span class="small text-gray-500">${stubs.length} stub${stubs.length === 1 ? '' : 's'} · ${+sum(stubs, 'hours').toFixed(2)} h</span>
+        </span>
+      </button>
+      ${body}
+    </div>`;
   }).join('');
 
-  const sub = selJob ? `${esc(jobLabel(selJob))} · ${yearText()}` : `Pay stubs for all jobs · ${yearText()}`;
   $('#view').innerHTML = `
-    ${pageHead('Jobs', sub, { label: 'Add Pay Stub', action: 'add', attrs: 'data-table="paystubs"' })}
+    ${pageHead('Jobs', `Tap a job to see its pay stubs · ${yearText()}`, { label: 'Add Pay Stub', action: 'add', attrs: 'data-table="paystubs"' })}
     <div class="row">
-      ${statCard('Net pay', cad(sum(stubs, 'net_pay')), `${stubs.length} pay stubs`, ICON.cash, 'success')}
-      ${statCard('Hours worked', +sum(stubs, 'hours').toFixed(2), stubs.length ? `Avg ${cad(sum(stubs, 'net_pay') / Math.max(sum(stubs, 'hours'), 1))}/hr (net)` : '', ICON.clock, 'primary')}
-      ${statCard('Bhaag on this pay', cad(sum(stubs, p => num(p.net_pay) * num(p.bhaag_percent) / 100)), 'Based on net pay', ICON.heart, 'secondary')}
+      ${statCard('Net pay', cad(sum(yearStubs, 'net_pay')), `${yearStubs.length} pay stubs`, ICON.cash, 'success')}
+      ${statCard('Hours worked', +sum(yearStubs, 'hours').toFixed(2), yearStubs.length ? `Avg ${cad(sum(yearStubs, 'net_pay') / Math.max(sum(yearStubs, 'hours'), 1))}/hr (net)` : '', ICON.clock, 'primary')}
+      ${statCard('Bhaag on this pay', cad(sum(yearStubs, p => num(p.net_pay) * num(p.bhaag_percent) / 100)), 'Based on net pay', ICON.heart, 'secondary')}
     </div>
-    ${tableCard('Pay stubs', ['Sr.', ...(showJobCol ? ['Job'] : []), 'Pay period', 'Pay date', ['Hours', 'num'], ['Amount', 'num'], ['', 'actions']], rows, foot, filter)}
-    ${tableCard('Your jobs', ['#', 'Job', 'Location', 'Type', 'Start – End', ['Stubs', 'num'], ['Total earned', 'num'], ['', 'actions']], jobsRows, '',
-      `<button class="btn btn-sm btn-outline-gray-800" data-action="add" data-table="jobs">${ICON.plus}Add Job</button>`)}`;
+    <div class="card border-0 shadow mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h2 class="fs-5 fw-bold mb-0">Your jobs</h2>
+        <button class="btn btn-sm btn-outline-gray-800" data-action="add" data-table="jobs">${ICON.plus}Add Job</button>
+      </div>
+      <div class="job-list">${jobItems || '<div class="empty-state">No jobs yet.</div>'}</div>
+    </div>`;
 }
 
 function renderOther() {
@@ -694,19 +727,46 @@ function renderIndia() {
     <td>${i + 1}</td><td>${fmtDate(p.payment_date)}</td>
     <td class="num fw-bold">${cad(p.cad_amount)}</td>
     <td>${esc(p.ca_account || '—')}</td>
-    <td class="num">${num(p.rate).toFixed(4)}</td>
+    <td class="num">${num(p.rate).toFixed(2)}</td>
     <td class="num fw-bold">${inr(p.inr_amount)}</td>
     <td class="text-wrap small">${esc(p.comments || '')}</td>
     ${actionBtns('india_payments', p.id, 'payment')}
   </tr>`).join('');
   const foot = rows.length ? `<tr><td colspan="2">Total (${rows.length})</td><td class="num">${cad(tCad)}</td><td></td>
-    <td class="num">${tCad ? (tInr / tCad).toFixed(4) : '—'}</td><td class="num">${inr(tInr)}</td><td colspan="2"></td></tr>` : '';
+    <td class="num">${tCad ? (tInr / tCad).toFixed(2) : '—'}</td><td class="num">${inr(tInr)}</td><td colspan="2"></td></tr>` : '';
+  // Loan progress always uses every payment (not the year filter)
+  const loanTotal = state.settings?.india_loan_inr != null ? num(state.settings.india_loan_inr) : null;
+  const paidAll = sum(state.india_payments, 'inr_amount');
+  const remaining = loanTotal != null ? round2(loanTotal - paidAll) : null;
+  const pctPaid = loanTotal ? Math.min(100, paidAll / loanTotal * 100) : 0;
+  const loanCard = loanTotal == null
+    ? `<div class="card border-0 shadow mb-4"><div class="card-body d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+         <div><div class="fw-bold">Total loan amount not set</div><div class="small text-gray-500">Set it once to track the remaining loan.</div></div>
+         <button class="btn btn-sm btn-gray-800" data-action="edit-loan">Set loan amount</button></div></div>`
+    : `<div class="card border-0 shadow mb-4"><div class="card-body">
+         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+           <h2 class="fs-5 fw-bold mb-0">Education loan · all years</h2>
+           <button class="btn btn-sm btn-outline-gray-600 btn-icon" data-action="edit-loan" title="Edit total loan" aria-label="Edit total loan">${ICON.edit}</button>
+         </div>
+         <div class="loan-eq">
+           <div><div class="stat-label">Total loan</div><div class="stat-value">${inr(loanTotal)}</div></div>
+           <div class="loan-op">−</div>
+           <div><div class="stat-label">Total received (INR)</div><div class="stat-value text-success">${inr(paidAll)}</div></div>
+           <div class="loan-op">=</div>
+           <div><div class="stat-label">Remaining loan</div><div class="stat-value ${remaining > 0 ? 'text-danger' : 'text-success'}">${inr(remaining)}</div></div>
+         </div>
+         <div class="progress mt-3" style="height:8px" role="progressbar" aria-valuenow="${pctPaid.toFixed(1)}" aria-valuemin="0" aria-valuemax="100">
+           <div class="progress-bar bg-success" style="width:${pctPaid.toFixed(2)}%"></div></div>
+         <div class="small text-gray-500 mt-1">${pctPaid.toFixed(1)}% paid</div>
+       </div></div>`;
+
   $('#view').innerHTML = `
     ${pageHead('India Payment', `Money sent for the student education loan · ${yearText()}`, { label: 'Add Payment', action: 'add', attrs: 'data-table="india_payments"' })}
+    ${loanCard}
     <div class="row">
       ${statCard('Total sent (CAD)', cad(tCad), `${rows.length} payments`, ICON.plane, 'tertiary')}
       ${statCard('Total received (INR)', inr(tInr), '', ICON.bank, 'info')}
-      ${statCard('Average rate', tCad ? (tInr / tCad).toFixed(4) : '—', 'INR per CAD, weighted', ICON.cash, 'secondary')}
+      ${statCard('Average rate', tCad ? (tInr / tCad).toFixed(2) : '—', 'INR per CAD, weighted', ICON.cash, 'secondary')}
     </div>
     ${tableCard('Payments', ['Sr.', 'Date', ['CAD amount', 'num'], 'CA account', ['Rate', 'num'], ['INR amount', 'num'], 'Comments', ['', 'actions']], html, foot)}`;
 }
@@ -795,17 +855,30 @@ document.addEventListener('click', e => {
   const { table, id } = el.dataset;
 
   if (a === 'add') {
-    if (table === 'paystubs' && !state.jobs.length) return toast('Add a job first.', 'error');
-    const defaults = table === 'paystubs' && state.jobFilter !== 'all' ? { job_id: state.jobFilter } : {};
-    openForm(table, null, { defaults });
+    if (table === 'paystubs' && !state.jobs.some(isActiveJob)) return toast('No active job. Add a job, or clear the end date of the job you work at now.', 'error');
+    const active = state.jobs.filter(isActiveJob);
+    const jobId = el.dataset.job ? Number(el.dataset.job) : (active.length === 1 ? active[0].id : null);
+    openForm(table, null, { defaults: table === 'paystubs' && jobId ? { job_id: jobId } : {} });
   } else if (a === 'edit') {
     openForm(table, rowFor(table, id));
   } else if (a === 'delete') {
     removeRow(table, Number(id), el.dataset.what);
-  } else if (a === 'pick-job') {
-    state.jobFilter = String(id);
+  } else if (a === 'toggle-job') {
+    const jid = Number(id);
+    state.openJobs.has(jid) ? state.openJobs.delete(jid) : state.openJobs.add(jid);
     render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else if (a === 'edit-loan') {
+    openForm('india_loan', state.settings || { india_loan_inr: null }, {
+      async onSave({ india_loan_inr }) {
+        const q = state.settings
+          ? sb.from('settings').update({ india_loan_inr }).eq('user_id', state.user.id)
+          : sb.from('settings').insert({ india_loan_inr });
+        const { error } = await q;
+        if (error) throw error;
+        await loadSettings();
+      },
+    });
+    if (!state.settings) $('#formTitle').textContent = 'Set Total Loan Amount';
   } else if (a === 'repayments') {
     state.loanSel = Number(id);
     render();
@@ -838,7 +911,6 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   if (e.target.id === 'yearSelect') { state.year = e.target.value; render(); }
-  if (e.target.id === 'jobFilter') { state.jobFilter = e.target.value; render(); }
 });
 
 $('#entityForm').addEventListener('submit', submitForm);
@@ -891,6 +963,8 @@ async function startApp(session) {
 
 function stopApp() {
   state.user = null;
+  state.openJobs = null;
+  state.settings = null;
   destroyCharts();
   Object.keys(TABLES).forEach(t => { state[t] = []; });
   show('loginView');

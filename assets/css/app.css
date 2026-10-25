@@ -69,3 +69,43 @@ body { background: #F2F4F6; }
 /* Top bar fixes */
 #yearSelect { min-width: 8.5rem; padding-right: 2.25rem; }
 #userEmail { color: #1F2937 !important; }
+
+/* Dashboard: income-by-source legend (HTML, never cropped) */
+.chart-box.pie { height: 220px; }
+.pie-legend { list-style: none; padding: 0; margin: 1rem 0 0; font-size: .82rem; }
+.pie-legend li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; border-bottom: 1px solid #F2F4F6; }
+.pie-legend li:last-child { border-bottom: 0; }
+.pie-legend .dot { width: .65rem; height: .65rem; border-radius: 50%; flex-shrink: 0; }
+.pie-legend .lbl { flex: 1; min-width: 0; color: #374151; }
+.pie-legend .amt { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pie-legend .pct { width: 3.2rem; text-align: right; color: #6B7280; font-variant-numeric: tabular-nums; }
+
+/* Jobs: expandable list */
+.job-item { border-bottom: 1px solid #E5E7EB; }
+.job-item:last-child { border-bottom: 0; }
+.job-head { width: 100%; display: flex; align-items: center; gap: .75rem; padding: 1rem 1.5rem; background: none; border: 0; text-align: left; }
+.job-head:hover { background: #F9FAFB; }
+.job-item.open > .job-head { background: #F9FAFB; }
+.job-chevron { font-size: 1.4rem; line-height: 1; color: #6B7280; transition: transform .15s; width: 1rem; }
+.job-item.open .job-chevron { transform: rotate(90deg); }
+.job-main { flex: 1; min-width: 0; }
+.job-sum { text-align: right; white-space: nowrap; }
+.job-body { padding: 0 0 1rem; background: #fff; }
+.job-tools { display: flex; align-items: center; gap: .5rem; padding: .75rem 1.5rem 0; flex-wrap: wrap; }
+@media (max-width: 575.98px) {
+  .job-head { padding: .85rem 1rem; flex-wrap: wrap; }
+  .job-sum { width: 100%; text-align: left; padding-left: 1.75rem; }
+  .job-tools { padding: .75rem 1rem 0; }
+}
+
+/* India Payment: loan equation */
+.loan-eq { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+.loan-eq .loan-op { font-size: 1.5rem; color: #9CA3AF; padding-bottom: .1rem; }
+@media (max-width: 575.98px) { .loan-eq { flex-direction: column; align-items: flex-start; gap: .25rem; } .loan-eq .loan-op { display: none; } }
+.pie-wrap { display: flex; align-items: center; gap: 2rem; }
+.pie-wrap .chart-box.pie { flex: 0 0 240px; height: 240px; }
+.pie-wrap .pie-legend { flex: 1; margin: 0; }
+@media (max-width: 767.98px) {
+  .pie-wrap { flex-direction: column; align-items: stretch; gap: 1rem; }
+  .pie-wrap .chart-box.pie { flex-basis: auto; height: 220px; }
+}
