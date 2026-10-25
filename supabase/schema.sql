@@ -12,10 +12,16 @@ create table if not exists public.jobs (
   employer    text not null,                       -- e.g. Signifi Solutions Inc.
   location    text,                                -- e.g. Mississauga ON
   job_type    text not null default 'Full-time' check (job_type in ('Full-time', 'Part-time')),
+  start_date  date,
+  end_date    date,
   is_current  boolean not null default false,
   sort_order  int not null default 0,
   created_at  timestamptz not null default now()
 );
+
+-- Added later: safe to run on a database that already has the jobs table.
+alter table public.jobs add column if not exists start_date date;
+alter table public.jobs add column if not exists end_date date;
 
 create table if not exists public.paystubs (
   id             bigint generated always as identity primary key,

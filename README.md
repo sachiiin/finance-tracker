@@ -6,7 +6,7 @@ Static site (no build step) → **Vercel**, data → **Supabase**, installable o
 | Tab | What it tracks |
 |---|---|
 | Dashboard | Stat cards, monthly in-vs-out bar chart, income-by-source pie, recent transactions, income by job |
-| Jobs *(comes in)* | Your 10 jobs (pre-loaded on first login) and their pay stubs: Sr., Pay Period, Pay Date, Hours, Net Pay |
+| Jobs *(comes in)* | Your 10 jobs (pre-loaded on first login) with Start – End dates, and their pay stubs: Sr., Pay Period, Pay Date, Hours, Net Pay |
 | CRA / Other Income *(comes in)* | Sr., Description, Date Received, Amount |
 | 10th-20th Bhaag *(goes out)* | Auto-calculated per month from net pay + CRA/Other. % is adjustable per row (10, 20, anything). Donations you give are recorded here and the balance is shown |
 | India Payment *(goes out)* | Sr., Date, CAD, CA Account, Rate (auto = INR ÷ CAD), INR, Comments |
@@ -76,6 +76,12 @@ Open the Vercel URL on your phone and sign in.
 
 It opens full-screen like a native app. An internet connection is needed to load and save data.
 
+## Database changes after first setup
+
+If you already ran `schema.sql`, run the files in `supabase/migrations/` that you haven't run yet (SQL Editor → paste → Run). Each one is safe to run more than once. Re-running the full `schema.sql` also works.
+
+- `001_job_dates.sql` adds Start / End dates to jobs.
+
 ## Updating the app
 
 After changing any file, bump `CACHE` in `sw.js` (e.g. `finance-v2`) so installed phones fetch the new version, then push — Vercel redeploys automatically.
@@ -91,7 +97,8 @@ assets/css/volt.min.css  Volt theme (compiled from themesberg/volt-bootstrap-5-d
 assets/css/app.css       small additions
 assets/vendor/           Bootstrap 5.0.2 JS, Chart.js 4.4.1
 manifest.webmanifest, sw.js, assets/icons/   PWA install support
-supabase/schema.sql      database tables + security
+supabase/schema.sql      database tables + security (full, for a new project)
+supabase/migrations/     changes to run on an existing database
 vercel.json              build command + headers
 ```
 

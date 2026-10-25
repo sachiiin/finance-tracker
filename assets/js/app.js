@@ -77,6 +77,11 @@ const sum = (rows, f) => round2(rows.reduce((a, r) => a + num(typeof f === 'func
 const byDateDesc = key => (a, b) => (b[key] || '').localeCompare(a[key] || '') || b.id - a.id;
 
 const jobById = id => state.jobs.find(j => j.id === id);
+function jobDuration(j) {
+  if (!j.start_date && !j.end_date) return '—';
+  const end = j.end_date ? fmtDate(j.end_date) : (j.is_current ? 'Present' : '—');
+  return `${j.start_date ? fmtDate(j.start_date) : '—'} – ${end}`;
+}
 const jobLabel = j => j ? `${j.title} – ${j.employer}` : 'Unknown job';
 
 function toast(msg, type = 'ok') {
@@ -157,9 +162,12 @@ const FORMS = {
       { k: 'employer', label: 'Employer', type: 'text', req: true },
       { k: 'location', label: 'Location', type: 'text' },
       { k: 'job_type', label: 'Type', type: 'select', options: () => ['Full-time', 'Part-time'].map(v => [v, v]), req: true },
+      { k: 'start_date', label: 'Start date', type: 'date', half: true },
+      { k: 'end_date', label: 'End date', type: 'date', half: true, help: 'Leave empty if you still work here.' },
       { k: 'is_current', label: 'Current job', type: 'checkbox' },
       { k: 'sort_order', label: 'Display order', type: 'number', step: '1', def: () => state.jobs.length + 1 },
     ],
+    validate: v => (v.start_date && v.end_date && v.end_date < v.start_date) ? 'End date is before the start date.' : null,
   },
   paystubs: {
     title: 'Pay Stub',
@@ -576,6 +584,7 @@ function renderJobs() {
         ${j.is_current ? '<span class="badge bg-success ms-1">Current</span>' : ''}<div class="small text-gray-500">${esc(j.employer)}</div></td>
       <td>${esc(j.location || '—')}</td>
       <td>${esc(j.job_type)}</td>
+      <td>${jobDuration(j)}</td>
       <td class="num">${s.length}</td>
       <td class="num fw-bold">${cad(sum(s, 'net_pay'))}</td>
       ${actionBtns('jobs', j.id, 'job')}
@@ -591,7 +600,7 @@ function renderJobs() {
       ${statCard('Bhaag on this pay', cad(sum(stubs, p => num(p.net_pay) * num(p.bhaag_percent) / 100)), 'Based on net pay', ICON.heart, 'secondary')}
     </div>
     ${tableCard('Pay stubs', ['Sr.', ...(showJobCol ? ['Job'] : []), 'Pay period', 'Pay date', ['Hours', 'num'], ['Amount', 'num'], ['', 'actions']], rows, foot, filter)}
-    ${tableCard('Your jobs', ['#', 'Job', 'Location', 'Type', ['Stubs', 'num'], ['Total earned', 'num'], ['', 'actions']], jobsRows, '',
+    ${tableCard('Your jobs', ['#', 'Job', 'Location', 'Type', 'Start – End', ['Stubs', 'num'], ['Total earned', 'num'], ['', 'actions']], jobsRows, '',
       `<button class="btn btn-sm btn-outline-gray-800" data-action="add" data-table="jobs">${ICON.plus}Add Job</button>`)}`;
 }
 
