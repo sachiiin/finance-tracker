@@ -417,7 +417,7 @@ function renderDashboard() {
   const jobIncome = sum(income.filter(r => r.kind === 'job'), 'amount');
   const otherIncome = sum(income.filter(r => r.kind === 'other'), 'amount');
   const totalIncome = round2(jobIncome + otherIncome);
-  const bhaagDue = sum(income, r => r.amount * r.percent / 100);
+  const bhaagDue = sum(bhaagGroups(), 'bhaag'); // same monthly rows as the Bhaag tab
   const donations = state.donations.filter(d => inYear(d.donation_date));
   const donated = sum(donations, 'amount');
   const india = state.india_payments.filter(p => inYear(p.payment_date));
@@ -624,6 +624,11 @@ function renderOther() {
     ${tableCard('CRA / Other income', ['Sr.', 'Description', 'Date received', ['Amount', 'num'], ['Bhaag %', 'num'], ['', 'actions']], html, foot)}`;
 }
 
+// Bhaag for one monthly row, rounded half-up to the cent. Works in whole cents
+// so e.g. 10% of $371.95 is exactly $37.195 → $37.20 (no floating-point drift).
+const bhaagOf = entries =>
+  Math.round(entries.reduce((a, e) => a + Math.round(e.amount * 100) * e.percent, 0) / 100) / 100;
+
 function bhaagGroups() {
   const groups = new Map();
   incomeRows().filter(r => inYear(r.date)).forEach(r => {
@@ -633,7 +638,7 @@ function bhaagGroups() {
   });
   return [...groups.values()].map(g => {
     const total = sum(g.entries, 'amount');
-    const bhaag = sum(g.entries, e => e.amount * e.percent / 100);
+    const bhaag = bhaagOf(g.entries);
     const pcts = [...new Set(g.entries.map(e => e.percent))];
     return { ...g, total, bhaag, pctText: pcts.length === 1 ? pct(pcts[0]) : 'Mixed', pctValue: pcts.length === 1 ? pcts[0] : 10 };
   }).sort((a, b) => b.month.localeCompare(a.month) || b.total - a.total);
@@ -676,7 +681,7 @@ function renderBhaag() {
     <div class="row">
       ${statCard('Income counted', cad(totalIncome), `${groups.length} monthly rows`, ICON.cash, 'success')}
       ${statCard('Bhaag due', cad(due), totalIncome ? `${pct(due / totalIncome * 100)} of income` : '', ICON.heart, 'secondary')}
-      ${statCard(balance > 0 ? 'Balance still to give' : 'Given in advance', cad(Math.abs(balance)), `Given so far ${cad(given)}`, balance > 0 ? ICON.alert : ICON.check, balance > 0 ? 'danger' : 'success')}
+      ${statCard(balance > 0 ? 'Balance still to give' : balance < 0 ? 'Given in advance' : 'All given',cad(Math.abs(balance)), `Given so far ${cad(given)}`, balance > 0 ? ICON.alert : ICON.check, balance > 0 ? 'danger' : 'success')}
     </div>
     ${tableCard('Monthly Bhaag', ['Sr.', 'Month', 'Description', ['Total amount', 'num'], ['%', 'num'], ['Bhaag amount', 'num'], ['', 'actions']], rows, foot)}
     ${tableCard('Donations given', ['Sr.', 'Date', 'Description', ['Amount', 'num'], ['', 'actions']], donRows, donFoot)}`;
