@@ -207,3 +207,7 @@ create index if not exists card_payments_to_idx on public.card_payments (to_acco
 alter table public.accounts drop constraint if exists accounts_kind_check;
 alter table public.accounts add constraint accounts_kind_check
   check (kind in ('chequing', 'savings', 'credit_card', 'cash'));
+
+-- Deposit account for income
+alter table public.paystubs     add column if not exists account_id bigint references public.accounts (id) on delete set null;
+alter table public.other_income add column if not exists account_id bigint references public.accounts (id) on delete set null;

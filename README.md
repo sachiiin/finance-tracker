@@ -87,6 +87,7 @@ If you already ran `schema.sql`, run the files in `supabase/migrations/` that yo
 - `003_display_name.sql` adds your display name (shown in the top bar instead of your email).
 - `004_accounts_expenses.sql` adds accounts, expenses and credit card payments, plus account / payment method on India payments, donations and money lent.
 - `005_savings_accounts.sql` adds Savings as an account type.
+- `006_income_deposit_account.sql` records which account pay stubs and CRA / other income were deposited into.
 
 ## Updating the app
 

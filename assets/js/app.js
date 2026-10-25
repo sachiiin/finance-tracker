@@ -108,6 +108,13 @@ const accountField = (k, label, { kinds = null, req = false, half = true } = {})
   k, label, type: 'select', numeric: true, req, half,
   options: row => state.accounts.filter(a => !kinds || kinds.includes(a.kind) || a.id === row?.[k]).map(a => [a.id, a.name]),
 });
+const DEPOSIT_KINDS = ['chequing', 'savings', 'cash'];
+// Account most recently used in these rows (to pre-fill "Deposited to")
+function lastAccount(rows, dateKey) {
+  const r = rows.filter(x => x.account_id && accountById(x.account_id)).sort(byDateDesc(dateKey))[0];
+  return r ? r.account_id : null;
+}
+const lastStubAccount = jobId => lastAccount(state.paystubs.filter(p => p.job_id === Number(jobId)), 'pay_date');
 // Payment-method dropdown that follows the chosen account
 const methodField = (from = 'account_id') => ({
   k: 'method', label: 'Payment method', type: 'select', half: true, methodFor: from,
@@ -218,9 +225,17 @@ const FORMS = {
       { k: 'pay_date', label: 'Pay date', type: 'date', req: true, def: todayISO },
       { k: 'hours', label: 'Hours', type: 'number', step: '0.01', min: '0', half: true },
       { ...moneyField('net_pay', 'Net pay (CAD)'), half: true },
+      accountField('account_id', 'Deposited to', { kinds: DEPOSIT_KINDS, half: false }),
       pctField,
     ],
     validate: v => (v.period_start && v.period_end && v.period_end < v.period_start) ? 'Pay period end is before the start.' : null,
+    // Picking a job fills in the account its last pay went to (unless you already chose one)
+    onInput(form, changed) {
+      if (changed === 'account_id') form.account_id.dataset.touched = '1';
+      if (changed !== 'job_id' || form.account_id.dataset.touched) return;
+      const acc = lastStubAccount(form.job_id.value);
+      if (acc) form.account_id.value = acc;
+    },
   },
   other_income: {
     title: 'CRA / Other Income',
@@ -228,6 +243,7 @@ const FORMS = {
       { k: 'description', label: 'Description', type: 'text', req: true, placeholder: 'e.g. CRA GST/HST credit', list: () => [...new Set(state.other_income.map(o => o.description))] },
       { k: 'date_received', label: 'Date received', type: 'date', req: true, def: todayISO, half: true },
       { ...moneyField('amount', 'Amount (CAD)'), half: true },
+      accountField('account_id', 'Deposited to', { kinds: DEPOSIT_KINDS, half: false }),
       pctField,
     ],
   },
@@ -465,7 +481,7 @@ async function removeRow(table, id, what) {
   }
   await load(table);
   if (table === 'loans') await load('loan_repayments');
-  if (table === 'accounts') await Promise.all(['india_payments', 'donations', 'loans', 'loan_repayments'].map(load));
+  if (table === 'accounts') await Promise.all(['india_payments', 'donations', 'loans', 'loan_repayments', 'paystubs', 'other_income'].map(load));
   toast(`${what[0].toUpperCase() + what.slice(1)} deleted`);
   render();
 }
@@ -695,6 +711,7 @@ function renderJobs() {
       <td>${k + 1}</td>
       <td>${p.period_start || p.period_end ? `${fmtDate(p.period_start)} – ${fmtDate(p.period_end)}` : '—'}</td>
       <td>${fmtDate(p.pay_date)}</td>
+      <td class="small">${esc(accountById(p.account_id)?.name || '—')}</td>
       <td class="num">${p.hours != null ? +num(p.hours).toFixed(2) : '—'}</td>
       <td class="num fw-bold">${cad(p.net_pay)}</td>
       ${actionBtns('paystubs', p.id, 'pay stub')}
@@ -702,9 +719,9 @@ function renderJobs() {
     const body = !open ? '' : `<div class="job-body">
       <div class="table-responsive"><table class="table mb-0">
         <thead class="thead-light"><tr><th class="border-0">Sr.</th><th class="border-0">Pay period</th><th class="border-0">Pay date</th>
-          <th class="border-0 num">Hours</th><th class="border-0 num">Amount</th><th class="border-0 actions"></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="6" class="empty-state">No pay stubs${state.year === 'all' ? '' : ' in ' + state.year}.</td></tr>`}</tbody>
-        ${stubs.length ? `<tfoot><tr><td colspan="3">Total (${stubs.length})</td><td class="num">${+sum(stubs, 'hours').toFixed(2)}</td><td class="num">${cad(sum(stubs, 'net_pay'))}</td><td></td></tr></tfoot>` : ''}
+          <th class="border-0">Deposited to</th><th class="border-0 num">Hours</th><th class="border-0 num">Amount</th><th class="border-0 actions"></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="7" class="empty-state">No pay stubs${state.year === 'all' ? '' : ' in ' + state.year}.</td></tr>`}</tbody>
+        ${stubs.length ? `<tfoot><tr><td colspan="4">Total (${stubs.length})</td><td class="num">${+sum(stubs, 'hours').toFixed(2)}</td><td class="num">${cad(sum(stubs, 'net_pay'))}</td><td></td></tr></tfoot>` : ''}
       </table></div>
       <div class="job-tools">
         ${active ? `<button class="btn btn-sm btn-gray-800" data-action="add" data-table="paystubs" data-job="${j.id}">${ICON.plus}Add Pay Stub</button>` : '<span class="small text-gray-500">Completed job – new pay stubs are only added to active jobs.</span>'}
@@ -754,18 +771,19 @@ function renderOther() {
     <td>${i + 1}</td>
     <td class="text-wrap">${esc(o.description)}</td>
     <td>${fmtDate(o.date_received)}</td>
+    <td class="small">${esc(accountById(o.account_id)?.name || '—')}</td>
     <td class="num fw-bold">${cad(o.amount)}</td>
     <td class="num">${pct(o.bhaag_percent)}</td>
     ${actionBtns('other_income', o.id, 'entry')}
   </tr>`).join('');
-  const foot = rows.length ? `<tr><td colspan="3">Total (${rows.length})</td><td class="num">${cad(sum(rows, 'amount'))}</td><td colspan="2"></td></tr>` : '';
+  const foot = rows.length ? `<tr><td colspan="4">Total (${rows.length})</td><td class="num">${cad(sum(rows, 'amount'))}</td><td colspan="2"></td></tr>` : '';
   $('#view').innerHTML = `
     ${pageHead('CRA / Other Income', `Benefits, refunds and other money received · ${yearText()}`, { label: 'Add Income', action: 'add', attrs: 'data-table="other_income"' })}
     <div class="row">
       ${statCard('Total received', cad(sum(rows, 'amount')), `${rows.length} entries`, ICON.bank, 'info')}
       ${statCard('Bhaag on this income', cad(sum(rows, o => num(o.amount) * num(o.bhaag_percent) / 100)), '', ICON.heart, 'secondary')}
     </div>
-    ${tableCard('CRA / Other income', ['Sr.', 'Description', 'Date received', ['Amount', 'num'], ['Bhaag %', 'num'], ['', 'actions']], html, foot)}`;
+    ${tableCard('CRA / Other income', ['Sr.', 'Description', 'Date received', 'Deposited to', ['Amount', 'num'], ['Bhaag %', 'num'], ['', 'actions']], html, foot)}`;
 }
 
 // Bhaag for one monthly row, rounded half-up to the cent. Works in whole cents
@@ -937,13 +955,18 @@ function renderAccounts() {
   const owed = sum(cards, 'balance');
   const rows = accs.map((a, i) => {
     const spentMonth = sum(state.expenses.filter(e => e.account_id === a.id && monthKey(e.expense_date) === month), 'amount');
+    const inMonth = round2(
+      sum(state.paystubs.filter(p => p.account_id === a.id && monthKey(p.pay_date) === month), 'net_pay')
+      + sum(state.other_income.filter(o => o.account_id === a.id && monthKey(o.date_received) === month), 'amount')
+      + sum(state.loan_repayments.filter(r => r.account_id === a.id && monthKey(r.repaid_date) === month), 'amount'));
     const isCard = a.kind === 'credit_card';
     return `<tr>
       <td>${i + 1}</td>
-      <td class="text-wrap"><div class="fw-bold">${esc(a.name)}</div><div class="small text-gray-500">${ACCOUNT_KINDS[a.kind] || a.kind}</div></td>
-      <td class="small">${esc((a.methods || []).join(', ') || '—')}</td>
+      <td class="text-wrap"><div class="fw-bold">${esc(a.name)}</div>
+        <div class="small text-gray-500">${[...new Set([ACCOUNT_KINDS[a.kind] || a.kind, ...(a.methods || [])])].map(esc).join(' · ')}</div></td>
       <td class="num fw-bold ${isCard && num(a.balance) > 0 ? 'text-danger' : ''}">${a.balance == null ? '—' : cad(a.balance)}${isCard && a.balance != null ? '<div class="small fw-normal text-gray-500">owed</div>' : ''}</td>
       <td>${fmtDate(a.balance_date)}</td>
+      <td class="num text-success">${a.kind === 'credit_card' ? '—' : cad(inMonth)}</td>
       <td class="num">${cad(spentMonth)}</td>
       ${actionBtns('accounts', a.id, 'account', `<button class="btn btn-sm btn-outline-gray-800 px-2 me-1" data-action="update-balance" data-id="${a.id}">Update balance</button>`)}
     </tr>`;
@@ -955,7 +978,7 @@ function renderAccounts() {
       ${statCard('Credit cards owed', cad(owed), `${cards.length} card${cards.length === 1 ? '' : 's'}`, ICON.card, owed > 0 ? 'danger' : 'success')}
       ${statCard('Net', cad(cashTotal - owed), 'Cash on hand − cards owed', ICON.cash, cashTotal - owed >= 0 ? 'primary' : 'danger')}
     </div>
-    ${tableCard('Accounts', ['#', 'Account', 'Payment methods', ['Balance', 'num'], 'As of', [`Spent in ${MONTHS[+month.slice(5) - 1]}`, 'num'], ['', 'actions']], rows)}`;
+    ${tableCard('Accounts', ['#', 'Account', ['Balance', 'num'], 'As of', [`In (${MONTHS[+month.slice(5) - 1]})`, 'num'], [`Spent (${MONTHS[+month.slice(5) - 1]})`, 'num'], ['', 'actions']], rows)}`;
 }
 
 function renderExpenses() {
@@ -1052,7 +1075,13 @@ document.addEventListener('click', e => {
     if (table === 'paystubs' && !state.jobs.some(isActiveJob)) return toast('No active job. Add a job, or clear the end date of the job you work at now.', 'error');
     const active = state.jobs.filter(isActiveJob);
     const jobId = el.dataset.job ? Number(el.dataset.job) : (active.length === 1 ? active[0].id : null);
-    openForm(table, null, { defaults: table === 'paystubs' && jobId ? { job_id: jobId } : {} });
+    const defaults = {};
+    if (table === 'paystubs') {
+      if (jobId) defaults.job_id = jobId;
+      defaults.account_id = (jobId && lastStubAccount(jobId)) || lastAccount(state.paystubs, 'pay_date');
+    }
+    if (table === 'other_income') defaults.account_id = lastAccount(state.other_income, 'date_received');
+    openForm(table, null, { defaults });
   } else if (a === 'edit') {
     openForm(table, rowFor(table, id));
   } else if (a === 'delete') {
