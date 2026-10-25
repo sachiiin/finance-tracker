@@ -1,5 +1,6 @@
 {
-  "buildCommand": "node scripts/build-config.js",
+  "buildCommand": "node scripts/build.js",
+  "outputDirectory": "dist",
   "headers": [
     {
       "source": "/sw.js",

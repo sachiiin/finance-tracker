@@ -36,7 +36,7 @@ git push -u origin main
 
 On <https://vercel.com>: **Add New → Project → Import** the repo.
 
-1. Framework preset: **Other**. Leave Build Command and Output Directory empty (`vercel.json` sets the build command).
+1. Framework preset: **Other**. Leave Build Command and Output Directory empty (`vercel.json` sets them: `node scripts/build.js` → `dist`).
 2. Open **Environment Variables** and add:
 
    | Name | Value |
@@ -94,7 +94,7 @@ After changing any file, bump `CACHE` in `sw.js` (e.g. `finance-v2`) so installe
 index.html               app shell (sidebar, top bar, login, form modal)
 assets/js/app.js         all pages, forms, charts, Supabase calls
 assets/js/config.example.js  template for local config.js (real config.js is git-ignored)
-scripts/build-config.js  Vercel build step: writes config.js from env vars
+scripts/build.js         Vercel build step: copies the site to dist/ and writes config.js from env vars
 assets/css/volt.min.css  Volt theme (compiled from themesberg/volt-bootstrap-5-dashboard, MIT)
 assets/css/app.css       small additions
 assets/vendor/           Bootstrap 5.0.2 JS, Chart.js 4.4.1
