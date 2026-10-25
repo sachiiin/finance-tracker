@@ -94,7 +94,10 @@ declare t text;
 begin
   foreach t in array array['jobs','paystubs','other_income','donations','india_payments','loans','loan_repayments']
   loop
+    -- Explicit Data API grants (Supabase no longer grants these automatically
+    -- for new tables in "public"). No grant to anon: the app is login-only.
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+    execute format('grant select, insert, update, delete on public.%I to service_role', t);
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "own rows" on public.%I', t);
     execute format(
