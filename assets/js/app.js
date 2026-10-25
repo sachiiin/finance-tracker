@@ -18,7 +18,7 @@ const DEFAULT_JOBS = [
   { title: 'Graphic Designer',    employer: 'Pizza Depot Head Office',  location: 'Brampton ON',    job_type: 'Part-time' },
   { title: 'Cashier',             employer: '#DESI Restaurant',         location: 'Toronto ON',     job_type: 'Part-time' },
   { title: 'Pit Crew Member',     employer: "Dickey's BBQ Pit",         location: 'Edmonton AB',    job_type: 'Part-time' },
-  { title: 'Cashier',             employer: 'A&W',                      location: 'Edmonton AB',    job_type: 'Full-time' },
+  { title: 'Cashier',             employer: 'A&W Restaurant',           location: 'Edmonton AB',    job_type: 'Full-time' },
   { title: 'E-Commerce Clerk',    employer: 'Metro Inc.',               location: 'Toronto ON',     job_type: 'Part-time' },
 ].map((j, i) => ({ is_current: false, ...j, sort_order: i + 1 }));
 
