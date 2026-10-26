@@ -488,8 +488,10 @@ async function removeRow(table, id, what) {
 
 /* ════════════════════════════ UI pieces ════════════════════════════ */
 
-function statCard(label, value, sub, icon, tone = 'primary', col = 'col-12 col-sm-6 col-xl-4') {
-  return `<div class="${col} mb-4">
+// href: optional page to open when the card is tapped (e.g. '#/expenses')
+function statCard(label, value, sub, icon, tone = 'primary', col = 'col-12 col-sm-6 col-xl-4', href = '') {
+  const open = href ? `<a href="${href}" class="stat-link" aria-label="${esc(label)} – open">` : '';
+  return `<div class="${col} mb-4">${open}
     <div class="card border-0 shadow stat-card h-100"><div class="card-body d-flex align-items-center">
       <div class="icon-shape icon-shape-${tone} rounded me-3">${icon}</div>
       <div class="min-w-0">
@@ -497,7 +499,8 @@ function statCard(label, value, sub, icon, tone = 'primary', col = 'col-12 col-s
         <div class="stat-value">${value}</div>
         ${sub ? `<div class="stat-sub">${sub}</div>` : ''}
       </div>
-    </div></div>
+      ${href ? '<span class="stat-go" aria-hidden="true">›</span>' : ''}
+    </div></div>${href ? '</a>' : ''}
   </div>`;
 }
 
@@ -544,7 +547,7 @@ function destroyCharts() {
 
 /* ════════════════════════════ Pages ════════════════════════════ */
 
-const C4 = 'col-12 col-sm-6 col-xl-3';
+const C4 = 'col-12 col-sm-6 col-xl-4 col-xxl-3';
 function renderDashboard() {
   const income = incomeRows().filter(r => inYear(r.date));
   const jobIncome = sum(income.filter(r => r.kind === 'job'), 'amount');
@@ -601,14 +604,14 @@ function renderDashboard() {
   $('#view').innerHTML = `
     ${pageHead('Dashboard', `Overview · ${yearText()}`)}
     <div class="row">
-      ${statCard('Total income', cad(totalIncome), `${income.length} entries · ${+hours.toFixed(2)} hrs worked`, ICON.cash, 'success', C4)}
-      ${statCard('Job income (net)', cad(jobIncome), `${state.paystubs.filter(p => inYear(p.pay_date)).length} pay stubs`, ICON.brief, 'primary', C4)}
-      ${statCard('CRA / Other income', cad(otherIncome), `${state.other_income.filter(o => inYear(o.date_received)).length} entries`, ICON.bank, 'info', C4)}
-      ${statCard('Expenses', cad(spent), `${expenses.length} entries`, ICON.bag, 'danger', C4)}
-      ${statCard('Bhaag balance', cad(bhaagDue - donated), `Due ${cad(bhaagDue)} · Given ${cad(donated)}`, ICON.heart, balanceTone, C4)}
-      ${statCard('Sent to India', cad(indiaCad), inr(indiaInr), ICON.plane, 'tertiary', C4)}
-      ${statCard('Money lent – outstanding', cad(outstanding), `${openLoans.length} open · ${openLoans.filter(l => l.overdue).length} overdue · all years`, ICON.user, 'secondary', C4)}
-      ${statCard('Net cash (accounts)', cad(cashOnHand - cardOwed), `Cash ${cad(cashOnHand)} · Cards owed ${cad(cardOwed)}`, ICON.card, cashOnHand - cardOwed >= 0 ? 'success' : 'danger', C4)}
+      ${statCard('Total income', cad(totalIncome), `${income.length} entries · ${+hours.toFixed(2)} hrs worked`, ICON.cash, 'success', C4, '#/jobs')}
+      ${statCard('Job income (net)', cad(jobIncome), `${state.paystubs.filter(p => inYear(p.pay_date)).length} pay stubs`, ICON.brief, 'primary', C4, '#/jobs')}
+      ${statCard('CRA / Other income', cad(otherIncome), `${state.other_income.filter(o => inYear(o.date_received)).length} entries`, ICON.bank, 'info', C4, '#/other')}
+      ${statCard('Expenses', cad(spent), `${expenses.length} entries`, ICON.bag, 'danger', C4, '#/expenses')}
+      ${statCard('Bhaag balance', cad(bhaagDue - donated), `Due ${cad(bhaagDue)} · Given ${cad(donated)}`, ICON.heart, balanceTone, C4, '#/bhaag')}
+      ${statCard('Sent to India', cad(indiaCad), inr(indiaInr), ICON.plane, 'tertiary', C4, '#/india')}
+      ${statCard('Money lent – outstanding', cad(outstanding), `${openLoans.length} open · ${openLoans.filter(l => l.overdue).length} overdue · all years`, ICON.user, 'secondary', C4, '#/lent')}
+      ${statCard('Net cash (accounts)', cad(cashOnHand - cardOwed), `Cash ${cad(cashOnHand)} · Cards owed ${cad(cardOwed)}`, ICON.card, cashOnHand - cardOwed >= 0 ? 'success' : 'danger', C4, '#/accounts')}
     </div>
     <div class="row">
       <div class="col-12 mb-4">
