@@ -9,18 +9,6 @@ if (!window.APP_CONFIG) {
 }
 const sb = window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY);
 
-const DEFAULT_JOBS = [
-  { title: 'QA Analyst',          employer: 'Signifi Solutions Inc.',   location: 'Mississauga ON', job_type: 'Full-time', is_current: true },
-  { title: 'Delivery Driver',     employer: 'OPDI Amazon Delivery',     location: null,             job_type: 'Full-time' },
-  { title: 'Delivery Driver',     employer: 'GOLO Amazon Delivery',     location: null,             job_type: 'Full-time' },
-  { title: 'Barista',             employer: 'Starbucks (Metro Inc.)',   location: null,             job_type: 'Part-time' },
-  { title: 'General Labour',      employer: 'Talent Surplus Inc.',      location: null,             job_type: 'Part-time' },
-  { title: 'Graphic Designer',    employer: 'Pizza Depot Head Office',  location: 'Brampton ON',    job_type: 'Part-time' },
-  { title: 'Cashier',             employer: '#DESI Restaurant',         location: 'Toronto ON',     job_type: 'Part-time' },
-  { title: 'Pit Crew Member',     employer: "Dickey's BBQ Pit",         location: 'Edmonton AB',    job_type: 'Part-time' },
-  { title: 'Cashier',             employer: 'A&W Restaurant',           location: 'Edmonton AB',    job_type: 'Full-time' },
-  { title: 'E-Commerce Clerk',    employer: 'Metro Inc.',               location: 'Toronto ON',     job_type: 'Part-time' },
-].map((j, i) => ({ is_current: false, ...j, sort_order: i + 1 }));
 
 // Table → default sort column (newest first unless asc)
 const TABLES = {
@@ -93,7 +81,7 @@ const DEFAULT_CATEGORIES = ['Groceries', 'Rent', 'Phone & Internet', 'Transport'
   'Bills & Utilities', 'Health', 'Subscriptions', 'Gifts', 'Other'];
 const uniq = list => [...new Set(list.filter(Boolean))];
 const accountById = id => state.accounts.find(a => a.id === Number(id));
-// "Neo Chequing · Interac"
+// e.g. "Main Chequing · Interac"
 const paidVia = r => {
   const name = accountById(r.account_id)?.name;
   return [name, r.method !== name ? r.method : null].filter(Boolean).join(' · ');
@@ -162,13 +150,6 @@ async function loadSettings() {
   state.settings = (data && data[0]) || null;
 }
 const loadAll = () => Promise.all([...Object.keys(TABLES).map(load), loadSettings()]);
-
-async function seedJobsIfEmpty() {
-  if (state.jobs.length) return;
-  const { error } = await sb.from('jobs').insert(DEFAULT_JOBS);
-  if (error) throw error;
-  await load('jobs');
-}
 
 /* Income rows used by Dashboard and Bhaag */
 function incomeRows() {
@@ -303,7 +284,7 @@ const FORMS = {
   accounts: {
     title: 'Account',
     fields: [
-      { k: 'name', label: 'Account name', type: 'text', req: true, placeholder: 'e.g. Neo Chequing' },
+      { k: 'name', label: 'Account name', type: 'text', req: true, placeholder: 'e.g. Main Chequing' },
       { k: 'kind', label: 'Type', type: 'select', req: true, half: true, options: () => Object.entries(ACCOUNT_KINDS) },
       { k: 'sort_order', label: 'Display order', type: 'number', step: '1', half: true, def: () => state.accounts.length + 1 },
       { k: 'methods', label: 'Payment methods', type: 'text', placeholder: 'e.g. Interac, UPI',
@@ -608,7 +589,7 @@ function renderDashboard() {
       ${statCard('Job income (net)', cad(jobIncome), `${state.paystubs.filter(p => inYear(p.pay_date)).length} pay stubs`, ICON.brief, 'primary', C4, '#/jobs')}
       ${statCard('CRA / Other income', cad(otherIncome), `${state.other_income.filter(o => inYear(o.date_received)).length} entries`, ICON.bank, 'info', C4, '#/other')}
       ${statCard('Expenses', cad(spent), `${expenses.length} entries`, ICON.bag, 'danger', C4, '#/expenses')}
-      ${statCard('Bhaag balance', cad(bhaagDue - donated), `Due ${cad(bhaagDue)} · Given ${cad(donated)}`, ICON.heart, balanceTone, C4, '#/bhaag')}
+      ${statCard('Bhaag balance', cad(bhaagDue - donated), `Total ${cad(bhaagDue)} · Given ${cad(donated)}`, ICON.heart, balanceTone, C4, '#/bhaag')}
       ${statCard('Sent to India', cad(indiaCad), inr(indiaInr), ICON.plane, 'tertiary', C4, '#/india')}
       ${statCard('Money lent – outstanding', cad(outstanding), `${openLoans.length} open · ${openLoans.filter(l => l.overdue).length} overdue · all years`, ICON.user, 'secondary', C4, '#/lent')}
       ${statCard('Net cash (accounts)', cad(cashOnHand - cardOwed), `Cash ${cad(cashOnHand)} · Cards owed ${cad(cardOwed)}`, ICON.card, cashOnHand - cardOwed >= 0 ? 'success' : 'danger', C4, '#/accounts')}
@@ -764,7 +745,7 @@ function renderJobs() {
         <h2 class="fs-5 fw-bold mb-0">Your jobs</h2>
         <button class="btn btn-sm btn-outline-gray-800" data-action="add" data-table="jobs">${ICON.plus}Add Job</button>
       </div>
-      <div class="job-list">${jobItems || '<div class="empty-state">No jobs yet.</div>'}</div>
+      <div class="job-list">${jobItems || '<div class="empty-state">No jobs yet. Use <b>Add Job</b> to add your first job, then add its pay stubs.</div>'}</div>
     </div>`;
 }
 
@@ -846,7 +827,7 @@ function renderBhaag() {
     ${pageHead('10th-20th Bhaag', `Calculated monthly from Jobs (net pay) and CRA/Other income · ${yearText()}`, { label: 'Record Donation', action: 'add', attrs: 'data-table="donations"' })}
     <div class="row">
       ${statCard('Income counted', cad(totalIncome), `${groups.length} monthly rows`, ICON.cash, 'success')}
-      ${statCard('Bhaag due', cad(due), totalIncome ? `${pct(due / totalIncome * 100)} of income` : '', ICON.heart, 'secondary')}
+      ${statCard('Total Bhaag (all income)', cad(due), totalIncome ? `${pct(due / totalIncome * 100)} of income · given + still to give` : '', ICON.heart, 'secondary')}
       ${statCard(balance > 0 ? 'Balance still to give' : balance < 0 ? 'Given in advance' : 'All given',cad(Math.abs(balance)), `Given so far ${cad(given)}`, balance > 0 ? ICON.alert : ICON.check, balance > 0 ? 'danger' : 'success')}
     </div>
     ${tableCard('Monthly Bhaag', ['Sr.', 'Month', 'Description', ['Total amount', 'num'], ['%', 'num'], ['Bhaag amount', 'num'], ['', 'actions']], rows, foot)}
@@ -1181,7 +1162,6 @@ async function startApp(session) {
   show('loadingView');
   try {
     await loadAll();
-    await seedJobsIfEmpty();
   } catch (err) {
     show('appView');
     $('#view').innerHTML = `<div class="alert alert-danger mt-4">Could not load data: ${esc(err.message)}.<br>Check that <code>supabase/schema.sql</code> has been run and <code>config.js</code> has the right project URL and key.</div>`;

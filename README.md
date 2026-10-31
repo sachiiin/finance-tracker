@@ -1,119 +1,123 @@
 # Finance Tracker
 
 Personal finance portal built on the Volt Bootstrap 5 dashboard theme.
-Static site (no build step) → **Vercel**, data → **Supabase**, installable on phone as an app (PWA).
+Plain HTML/CSS/JS hosted on **Vercel**, data in **Supabase**, installable on a phone as an app (PWA).
 
 | Tab | What it tracks |
 |---|---|
-| Dashboard | Stat cards, monthly in-vs-out bar chart, income-by-source pie, recent transactions, income by job |
-| Jobs *(comes in)* | Your 10 jobs (pre-loaded on first login) with Start – End dates; tap a job to see its pay stubs. New stubs can only be added to active (not completed) jobs: Sr., Pay Period, Pay Date, Hours, Net Pay |
-| CRA / Other Income *(comes in)* | Sr., Description, Date Received, Amount |
-| 10th-20th Bhaag *(goes out)* | Auto-calculated per month from net pay + CRA/Other. % is adjustable per row (10, 20, anything). Donations you give are recorded here and the balance is shown |
-| India Payment *(goes out)* | Sr., Date, CAD, CA Account, Rate (auto = INR ÷ CAD, 2 decimals), INR, Comments. Loan tracker: Total loan − Total received (INR) = Remaining loan |
-| Money Lent | Sr., Name, Description, Amount, Due Date + status (Pending / Partial / Returned / Overdue) and partial repayments |
-| Accounts | Chequing, savings, credit cards and cash with payment methods; update balances to see cash on hand, cards owed and net |
-| Expenses | Everyday spending by account, method and category, plus credit card payments (not counted as spending) |
+| Dashboard | Totals (tap a card to open its page), monthly in-vs-out chart, income by source, recent transactions, income by job |
+| Accounts | Chequing, savings, credit cards and cash with payment methods; balances you update → cash on hand, cards owed, net; money in / spent this month |
+| Jobs *(comes in)* | Your jobs with start – end dates; tap a job to see its pay stubs (pay period, pay date, hours, net pay, deposited to) |
+| CRA / Other Income *(comes in)* | Description, date received, amount, deposited to |
+| 10th-20th Bhaag *(goes out)* | Worked out per month from net pay + CRA/Other (10%, 20% or any % per row); donations given and the balance left |
+| India Payment *(goes out)* | Date, CAD, account, rate (= INR ÷ CAD), INR, comments; optional loan tracker |
+| Expenses *(goes out)* | Everyday spending by account, method and category; credit card payments kept separate (not counted as spending) |
+| Money Lent | Who owes you, due dates, status, partial repayments |
 
-Every table supports Add, Edit and Delete. A year selector at the top filters every tab except Money Lent (which always shows everything outstanding).
+Every table supports add, edit and delete. The year selector at the top filters the tabs by year.
 
 ---
 
-## 1. Supabase (database + login)
+## New setup (about 15 minutes)
 
-1. Create a project at <https://supabase.com>.
-2. **SQL Editor → New query** → paste all of `supabase/schema.sql` → **Run**.
-   It creates 7 tables with Row Level Security, so only your signed-in account can read or write your rows. Safe to run again.
-3. **Authentication → Users → Add user → Create new user**: your email + a strong password, tick *Auto Confirm User*.
-4. **Authentication → Sign In / Providers**: turn **off** "Allow new users to sign up" so nobody else can create an account.
-5. **Project Settings → API**: copy the **Project URL** and the **anon / publishable** key.
+You need free accounts on **GitHub**, **Supabase** and **Vercel**.
 
-## 2. GitHub + Vercel (keys stay out of git)
+### 1. Get the code into your own GitHub repo
 
-The Supabase URL and key are **not** in the repo. `assets/js/config.js` is in `.gitignore`; Vercel creates it at deploy time from environment variables.
+Upload or push this folder to a **new private repository** on GitHub, for example:
 
 ```bash
-git remote add origin https://github.com/<you>/finance-tracker.git
+git init -b main
+git add .
+git commit -m "Finance tracker"
+git remote add origin https://github.com/<your-username>/finance-tracker.git
 git push -u origin main
 ```
 
-On <https://vercel.com>: **Add New → Project → Import** the repo.
+(GitHub Desktop works too: File → Add local repository → choose this folder → Publish repository, and keep *Keep this code private* ticked.)
 
-1. Framework preset: **Other**. Leave Build Command and Output Directory empty (`vercel.json` sets them: `node scripts/build.js` → `dist`).
-2. Open **Environment Variables** and add:
+### 2. Create the database in Supabase
+
+1. Create a project at <https://supabase.com>.
+2. Open **SQL Editor → New query**, paste the whole of **`supabase/schema.sql`** and click **Run**.
+   It creates all 11 tables with Row Level Security. The last result lists the tables; every row should show `rls_on = true`.
+3. **Authentication → Users → Add user → Create new user**: enter your email and a strong password, and tick **Auto Confirm User**.
+4. **Authentication → Sign In / Providers**: turn **off** *Allow new users to sign up*, so nobody else can create an account.
+5. **Project Settings → API**: copy the **Project URL** and the **anon / publishable** key for the next step.
+
+### 3. Put it online with Vercel
+
+The Supabase URL and key never go into GitHub: `assets/js/config.js` is git-ignored, and Vercel creates it during each deploy.
+
+1. On <https://vercel.com>: **Add New → Project → Import** your repo. Framework preset: **Other**. Leave Build Command and Output Directory empty (`vercel.json` sets them).
+2. Under **Environment Variables**, add:
 
    | Name | Value |
    |---|---|
-   | `SUPABASE_URL` | `https://xxxx.supabase.co` |
+   | `SUPABASE_URL` | your Project URL, e.g. `https://xxxx.supabase.co` |
    | `SUPABASE_ANON_KEY` | your anon / publishable key (`eyJ...` or `sb_publishable_...`) |
 
-3. Deploy. If either variable is missing, the build fails with a clear message instead of deploying a broken site.
+3. Click **Deploy**. If either variable is missing, the build stops with a clear message.
+4. Back in Supabase → **Authentication → URL Configuration**, set **Site URL** to your Vercel address.
 
 If you change a variable later, redeploy (Deployments → ⋯ → Redeploy) for it to take effect.
 
-Then in Supabase → **Authentication → URL Configuration**, set *Site URL* to your Vercel URL.
+### 4. First sign-in
 
-### What "confidential" means here
+Open your Vercel address and sign in with the user from step 2.3. Everything starts empty:
 
-- The key is kept out of GitHub, so it isn't in your repo or its history.
-- A browser app still needs the key to talk to Supabase, so the deployed `config.js` is downloadable by anyone who opens your site. That is expected for the **anon / publishable** key. What protects your data is Row Level Security (only your login can read or write rows) and turning off sign-ups (step 1.4).
-- **Never** use the `service_role` / secret key in this app. It bypasses RLS and must stay server-side only.
+1. **Accounts → Add Account** for each bank account, credit card and cash (payment methods such as `Interac, UPI` or `Card`).
+2. **Jobs → Add Job**, then **Add Pay Stub** under each job.
+3. Top-right menu → **Edit name** to show your name instead of your email.
 
-### Running locally
-
-```bash
-cp assets/js/config.example.js assets/js/config.js   # fill in your values; git ignores this file
-python3 -m http.server 8000                          # open http://localhost:8000
-```
-
-## 3. Supabase redirect (optional)
-
-Add `http://localhost:8000` under Supabase → Authentication → URL Configuration → Redirect URLs if you test locally.
-
-## 4. Install on your phone
-
-Open the Vercel URL on your phone and sign in.
+### 5. Install on your phone
 
 - **iPhone (Safari):** Share → *Add to Home Screen*.
-- **Android (Chrome):** ⋮ menu → *Install app* (or *Add to Home screen*).
+- **Android (Chrome):** ⋮ menu → *Install app*.
 
-It opens full-screen like a native app. An internet connection is needed to load and save data.
+It opens full-screen like an app. An internet connection is needed to load and save data.
 
-## Database changes after first setup
+---
 
-If you already ran `schema.sql`, run the files in `supabase/migrations/` that you haven't run yet (SQL Editor → paste → Run). Each one is safe to run more than once. Re-running the full `schema.sql` also works.
+## Keys and privacy
 
-- `001_job_dates.sql` adds Start / End dates to jobs.
-- `002_settings.sql` adds the settings table used by the India loan tracker (total loan amount).
-- `003_display_name.sql` adds your display name (shown in the top bar instead of your email).
-- `004_accounts_expenses.sql` adds accounts, expenses and credit card payments, plus account / payment method on India payments, donations and money lent.
-- `005_savings_accounts.sql` adds Savings as an account type.
-- `006_income_deposit_account.sql` records which account pay stubs and CRA / other income were deposited into.
+- The anon / publishable key is designed to be used in the browser, so anyone who opens the site can see it in `config.js`. Your data is protected by **Row Level Security** (each login only sees its own rows) and by **turning off sign-ups**.
+- **Never** put the `service_role` / secret key in this app. It bypasses Row Level Security.
 
-## Updating the app
+## Running on your computer
 
-After changing any file, bump `CACHE` in `sw.js` (e.g. `finance-v2`) so installed phones fetch the new version, then push — Vercel redeploys automatically.
+```bash
+cp assets/js/config.example.js assets/js/config.js   # fill in your URL and key; git ignores this file
+python3 -m http.server 8000                          # then open http://localhost:8000
+```
+
+Use the server rather than opening `index.html` directly. If sign-in fails locally, add `http://localhost:8000` under Supabase → Authentication → URL Configuration → Redirect URLs.
+
+## Updating an existing setup
+
+Copy in the new files, commit and push; Vercel redeploys. Bump `CACHE` in `sw.js` (e.g. `finance-v12`) so installed phones pick up the new version.
 
 ## Files
 
 ```
-index.html               app shell (sidebar, top bar, login, form modal)
-assets/js/app.js         all pages, forms, charts, Supabase calls
-assets/js/config.example.js  template for local config.js (real config.js is git-ignored)
-scripts/build.js         Vercel build step: copies the site to dist/ and writes config.js from env vars
-assets/css/volt.min.css  Volt theme (compiled from themesberg/volt-bootstrap-5-dashboard, MIT)
-assets/css/app.css       small additions
-assets/vendor/           Bootstrap 5.0.2 JS, Chart.js 4.4.1
-manifest.webmanifest, sw.js, assets/icons/   PWA install support
-supabase/schema.sql      database tables + security (full, for a new project)
-supabase/migrations/     changes to run on an existing database
-vercel.json              build command + headers
+index.html                   app shell (sidebar, top bar, sign-in, form window)
+assets/js/app.js             all pages, forms, charts and Supabase calls
+assets/js/config.example.js  template for a local config.js (the real one is git-ignored)
+assets/css/volt.min.css      Volt theme (compiled from themesberg/volt-bootstrap-5-dashboard, MIT)
+assets/css/app.css           small additions
+assets/vendor/               Bootstrap 5.0.2 JS, Chart.js 4.4.1
+manifest.webmanifest, sw.js, assets/icons/   phone install support
+scripts/build.js             Vercel build: copies the site to dist/ and writes config.js from the env vars
+supabase/schema.sql          the complete database setup (one file)
+vercel.json                  build settings and security headers
 ```
 
-## Notes on the calculations
+## How the numbers are worked out
 
-- **Bhaag due** = Σ(net pay × row %) + Σ(CRA/Other amount × row %). The month is taken from the pay date / date received.
-- Changing the % on a Bhaag row updates every income entry in that month+source. You can also set the % per entry in the Jobs / CRA forms.
-- **Balance** = Bhaag due − donations given (for the selected year).
-- A job that still has pay stubs can't be deleted; delete or move its stubs first.
+- **Bhaag due** = Σ(net pay × row %) + Σ(CRA/Other amount × row %), grouped by month of pay date / date received and rounded to the cent per month.
+- **Bhaag balance** = Bhaag due − donations given (for the selected year).
+- **India rate** = INR ÷ CAD, saved with 2 decimals.
+- **Account balances** are what you enter from your bank (with an "as of" date); expenses don't change them. Credit card payments are transfers, not spending.
+- A job that still has pay stubs, or an account that still has expenses, can't be deleted until those are removed.
 
-Theme: Volt by Themesberg, MIT licence — see `assets/css/VOLT-LICENSE.md`.
+Theme: Volt by Themesberg, MIT licence – see `assets/css/VOLT-LICENSE.md`.
